@@ -56,25 +56,25 @@ def rebuild() -> dict:
     PERSONA_PATH.parent.mkdir(parents=True, exist_ok=True)
     PERSONA_PATH.write_text(json.dumps(persona, ensure_ascii=False, indent=2))
     md = [
-        f"# Know you better",
-        f"",
+        "# 更了解你 / Know you better",
+        "",
         f"Updated {persona['updated_at']}",
-        f"",
-        f"## Identity",
+        "",
+        "## 身分 / Identity",
         f"- {persona['identity']['name']} · {persona['identity']['role']}",
-        f"",
-        f"## How you write",
+        "",
+        "## 文風 / How you write",
         *[f"- {x}" for x in persona["how_you_write"]],
-        f"",
-        f"## How you run the inbox",
+        "",
+        "## 收信習慣 / How you run the inbox",
         *[f"- {x}" for x in persona["how_you_run_inbox"]],
-        f"",
-        f"## Attention now",
+        "",
+        "## 此刻要注意 / Attention now",
         *[f"- {x}" for x in persona["attention_now"]],
-        f"",
-        f"## Top senders",
+        "",
+        "## 常出現的寄件人 / Top senders",
         *[f"- {s['email']} ({s['count']})" for s in persona["top_senders"]],
-        f"",
+        "",
     ]
     (ROOT / "vault" / "persona.md").write_text("\n".join(md))
     return persona

@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""OpenInbox HTTP app: dashboard + mail + second brain + BYO agent."""
+"""TooPowerInbox HTTP app: dashboard + mail + second brain + BYO agent."""
 from __future__ import annotations
 
 import json
@@ -80,7 +80,7 @@ class Handler(BaseHTTPRequestHandler):
         if path == "/api/health":
             cfg = yhbmail.load_cfg()
             return json_ok(self, {
-                "ok": True, "name": "OpenInbox", "port": PORT,
+                "ok": True, "name": "TooPowerInbox", "port": PORT,
                 "mode": cfg.get("mode") or "demo",
                 "sync": _sync, "counts": yhbmail.counts(),
                 "agent": agent_bridge.load_agent_cfg().get("driver"),
@@ -114,7 +114,8 @@ class Handler(BaseHTTPRequestHandler):
         if path == "/api/v1/tools":
             return json_ok(self, {"tools": agent_bridge.TOOLS, "skills": agent_bridge.list_skills()})
         if path == "/api/v1/context":
-            return json_ok(self, agent_bridge.context_pack(ask=q.get("ask") or "", skill=q.get("skill") or ""))
+            return json_ok(self, agent_bridge.context_pack(
+                ask=q.get("ask") or "", skill=q.get("skill") or "", lang=q.get("lang") or "en"))
         return json_ok(self, {"error": "not found"}, 404)
 
     def do_POST(self):
@@ -138,7 +139,7 @@ class Handler(BaseHTTPRequestHandler):
         if path in ("/api/agent", "/api/v1/agent/run"):
             return json_ok(self, agent_bridge.run_agent(
                 ask=body.get("ask") or "", skill=body.get("skill") or "",
-                driver=body.get("driver")))
+                driver=body.get("driver"), lang=body.get("lang") or "en"))
         if path.startswith("/api/v1/tools/"):
             name = path[len("/api/v1/tools/"):]
             return json_ok(self, agent_bridge.invoke_tool(name, body))
@@ -148,7 +149,8 @@ class Handler(BaseHTTPRequestHandler):
         if path == "/api/draft":
             return json_ok(self, yhbmail.save_draft(
                 body.get("account") or "you@example.com", body.get("to") or "",
-                body.get("subject") or "", body.get("body") or ""))
+                body.get("subject") or "", body.get("body") or "",
+                lang=body.get("lang") or "en"))
         if path == "/api/rebuild":
             persona.rebuild()
             return json_ok(self, second_brain.rebuild())
@@ -159,7 +161,7 @@ def main() -> None:
     boot()
     httpd = ThreadingHTTPServer(("127.0.0.1", PORT), Handler)
     url = f"http://127.0.0.1:{PORT}/"
-    print(f"OpenInbox  {url}", flush=True)
+    print(f"TooPowerInbox  {url}", flush=True)
     if os.environ.get("OPENINBOX_NO_BROWSER") != "1":
         threading.Timer(0.6, lambda: webbrowser.open(url)).start()
     httpd.serve_forever()

@@ -401,7 +401,7 @@ def counts() -> dict:
     return {"emails": n, "unread": unread, "events": ev, "categories": cats}
 
 
-def save_draft(account: str, to_addr: str, subject: str, body: str) -> dict:
+def save_draft(account: str, to_addr: str, subject: str, body: str, lang: str = "en") -> dict:
     con = db()
     cur = con.execute(
         "INSERT INTO drafts(account, to_addr, subject, body, created_at) VALUES (?,?,?,?,?)",
@@ -410,4 +410,5 @@ def save_draft(account: str, to_addr: str, subject: str, body: str) -> dict:
     con.commit()
     did = cur.lastrowid
     con.close()
-    return {"id": did, "note": "Local draft only. Send is disabled by default."}
+    note = "草稿只留本機。預設不寄信。" if str(lang).startswith("zh") else "Local draft only. Send is disabled by default."
+    return {"id": did, "note": note}

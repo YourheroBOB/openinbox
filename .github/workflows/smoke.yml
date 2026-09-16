@@ -19,6 +19,22 @@ jobs:
           done
           exit 1
       - run: |
-          curl -fsS -X POST http://127.0.0.1:8770/api/v1/agent/run \
-            -H 'Content-Type: application/json' \
-            -d '{"skill":"morning-brief"}' | python3 -c 'import json,sys; d=json.load(sys.stdin); assert "Needs you" in d["answer"]'
+          python3 - <<'PY'
+          import json, urllib.request
+          h = json.loads(urllib.request.urlopen("http://127.0.0.1:8770/api/health").read())
+          assert h["name"] == "TooPowerInbox"
+          def run(body):
+              req = urllib.request.Request(
+                  "http://127.0.0.1:8770/api/v1/agent/run",
+                  data=json.dumps(body).encode(),
+                  headers={"Content-Type": "application/json"},
+                  method="POST",
+              )
+              return json.loads(urllib.request.urlopen(req).read())
+          en = run({"skill": "morning-brief", "lang": "en"})
+          zh = run({"skill": "morning-brief", "lang": "zh-Hant"})
+          assert "Needs you" in en["answer"]
+          assert "需要你" in zh["answer"]
+          html = urllib.request.urlopen("http://127.0.0.1:8770/").read().decode()
+          assert "TooPowerInbox" in html and "繁中" in html
+          PY

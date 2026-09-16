@@ -1,6 +1,8 @@
 # Bring your own agent
 
-OpenInbox never ships a hosted model. The dashboard runs a local heuristic by default. Point `agent.json` at whatever you already pay for.
+[正體中文](README.zh-Hant.md) · English
+
+TooPowerInbox never ships a hosted model. The dashboard runs a local heuristic by default. Point `agent.json` at whatever you already pay for.
 
 ## Drivers
 

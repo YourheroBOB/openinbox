@@ -1,9 +1,9 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="zh-Hant">
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>OpenInbox</title>
+  <title>TooPowerInbox</title>
   <style>
     :root {
       --bg: #12110f; --panel: #1b1916; --ink: #f4efe6; --muted: #9b9286;
@@ -12,17 +12,20 @@
     }
     * { box-sizing: border-box; }
     html, body { margin: 0; height: 100%; background: var(--bg); color: var(--ink);
-      font: 15px/1.45 "Iowan Old Style", "Source Han Serif TC", Georgia, serif; }
+      font: 15px/1.45 "Iowan Old Style", "Source Han Serif TC", "Noto Serif TC", Georgia, serif; }
     button, input, textarea { font: inherit; }
     button { cursor: pointer; }
-    #app { display: grid; grid-template-columns: 220px 1fr 400px; height: 100vh; }
+    #app { display: grid; grid-template-columns: 228px 1fr 400px; height: 100vh; }
     aside { border-right: 1px solid var(--line); padding: 18px 14px; display: flex; flex-direction: column; gap: 14px; }
-    .brand { font-size: 20px; letter-spacing: .04em; }
-    .brand small { display: block; color: var(--muted); font-size: 12px; margin-top: 4px; }
+    .brand { font-size: 20px; letter-spacing: .03em; }
+    .brand small { display: block; color: var(--muted); font-size: 12px; margin-top: 4px; line-height: 1.4; }
+    .lang { display: flex; border: 1px solid var(--line); border-radius: 8px; overflow: hidden; }
+    .lang button { flex: 1; background: transparent; color: var(--muted); border: 0; padding: 6px 0; }
+    .lang button.on { background: #26211c; color: var(--ink); }
     .nav button { width: 100%; text-align: left; background: transparent; color: var(--ink);
       border: 1px solid transparent; padding: 8px 10px; border-radius: 6px; }
     .nav button.on { background: #26211c; border-color: var(--line); }
-    .label { color: var(--muted); font-size: 11px; letter-spacing: .08em; text-transform: uppercase; }
+    .label { color: var(--muted); font-size: 11px; letter-spacing: .08em; }
     main { display: flex; flex-direction: column; min-width: 0; border-right: 1px solid var(--line); }
     .toolbar { display: flex; gap: 8px; align-items: center; padding: 12px 14px; border-bottom: 1px solid var(--line); }
     .toolbar input { flex: 1; background: var(--panel); color: var(--ink); border: 1px solid var(--line); padding: 8px 10px; border-radius: 6px; }
@@ -33,7 +36,7 @@
     .stat b { display: block; font-size: 22px; }
     .stat span { color: var(--muted); font-size: 12px; }
     .bars { padding: 0 14px 12px; }
-    .bar-row { display: grid; grid-template-columns: 110px 1fr 36px; gap: 8px; align-items: center; margin: 6px 0; }
+    .bar-row { display: grid; grid-template-columns: 7.5em 1fr 36px; gap: 8px; align-items: center; margin: 6px 0; }
     .bar { height: 10px; background: #2a261f; border-radius: 99px; overflow: hidden; }
     .bar i { display: block; height: 100%; }
     .bar i.needs_you { background: var(--need); }
@@ -66,21 +69,25 @@
 <body>
   <div id="app">
     <aside>
-      <div class="brand">OpenInbox<small>Local mail brain. Bring your own agent.</small></div>
-      <div class="nav">
-        <button class="on" data-view="dash">Dashboard</button>
-        <button data-view="mail">Inbox</button>
-        <button data-view="brain">Second Brain</button>
-        <button data-view="persona">Know you better</button>
-        <button data-view="agent">Agent</button>
+      <div class="brand">TooPowerInbox<small id="tagline"></small></div>
+      <div class="lang">
+        <button type="button" data-lang="zh-Hant" id="langZh">繁中</button>
+        <button type="button" data-lang="en" id="langEn">EN</button>
       </div>
-      <div class="status" id="status">loading</div>
+      <div class="nav">
+        <button class="on" data-view="dash" data-i18n="navDash"></button>
+        <button data-view="mail" data-i18n="navMail"></button>
+        <button data-view="brain" data-i18n="navBrain"></button>
+        <button data-view="persona" data-i18n="navPersona"></button>
+        <button data-view="agent" data-i18n="navAgent"></button>
+      </div>
+      <div class="status" id="status"></div>
     </aside>
     <main>
       <div class="toolbar">
-        <input id="q" placeholder="Search mail, senders, second brain" />
-        <button class="btn" id="searchBtn">Search</button>
-        <button class="btn primary" id="syncBtn">Refresh</button>
+        <input id="q" />
+        <button class="btn" id="searchBtn"></button>
+        <button class="btn primary" id="syncBtn"></button>
       </div>
       <div class="stats" id="stats"></div>
       <div class="bars" id="bars"></div>
@@ -89,40 +96,239 @@
     <section>
       <div class="pane" id="pane"></div>
       <div class="agent">
-        <div class="label">Skills · BYO agent</div>
+        <div class="label" id="skillLabel"></div>
         <div class="skills" id="skills"></div>
-        <textarea id="ask" placeholder="Ask your agent. Morning brief, who is loud, draft a reply…"></textarea>
+        <textarea id="ask"></textarea>
         <div>
-          <button class="btn primary" id="askBtn">Run agent</button>
-          <button class="btn" id="draftBtn">Save pane as draft</button>
+          <button class="btn primary" id="askBtn"></button>
+          <button class="btn" id="draftBtn"></button>
         </div>
       </div>
     </section>
   </div>
   <script>
-    const state = { view: "dash", overview: null, selected: null };
+    const I18N = {
+      "zh-Hant": {
+        tagline: "本機信箱腦。你自己帶 Agent 進來。",
+        navDash: "總覽",
+        navMail: "收件匣",
+        navBrain: "第二大腦",
+        navPersona: "更了解你",
+        navAgent: "Agent",
+        search: "搜尋",
+        refresh: "重新整理",
+        searchPh: "搜尋信件、寄件人、第二大腦",
+        askPh: "問你的 Agent。晨間簡報、誰在催、起草回信。",
+        skillLabel: "技能 · 自帶 Agent",
+        runAgent: "執行 Agent",
+        saveDraft: "把右側存成草稿",
+        loading: "載入中",
+        refreshing: "重新整理中",
+        agentSuffix: " Agent",
+        mail: "信件",
+        unread: "未讀",
+        brainCards: "大腦卡片",
+        calendar: "行事曆",
+        needs_you: "需要你",
+        upcoming: "即將到來",
+        worth_a_look: "值得一看",
+        fyi: "僅供參考",
+        other: "可清理",
+        dashTitle: "總覽",
+        dashLead: "五桶分信，加上第二大腦。第一次開啟會載入示範信件。之後再用 gog 或 gsk 接真信箱。",
+        attention: "此刻要注意",
+        howWrite: "你怎麼寫信",
+        emptyNeed: "「需要你」是空的。重新整理，或接上真信箱。",
+        none: "無",
+        inboxTitle: "收件匣",
+        inboxLead: "點一封信看內文。預設不寄信。草稿只留在這台機器。",
+        brainTitle: "第二大腦",
+        brainLead: "張卡片在 vault/cards。從信件與行事曆蒸餾出來。",
+        personaTitle: "更了解你",
+        inboxHabits: "收信習慣",
+        writing: "文風",
+        facts: "已學到的事實",
+        source: "來源",
+        threads: "封往來",
+        agentTitle: "自己帶 Agent 進來",
+        agentLead: "預設驅動是 local。把 agent.json 指到 OpenAI 相容端點、CLI 或 HTTP worker。工具在 /api/v1/tools。",
+        contextHelp: "人格、看板、近期信件，給你自己的迴圈用。",
+        running: "Agent 執行中",
+        draftSaved: "草稿已存本機",
+        notFound: "找不到",
+        "morning-brief": "晨間簡報",
+        "catch-me-up": "快速補課",
+        "categorize-inbox": "信箱分類",
+        "plan-my-week": "本週安排",
+        "know-you-better": "更了解你",
+        list_inbox: "列出近期信件。參數：q、category、limit",
+        brain_board: "五桶分信看板。參數：hours",
+        search_brain: "搜尋第二大腦卡片。參數：q",
+        persona: "讀取「更了解你」檔案。無需參數",
+        save_draft: "存本機草稿。絕不寄出。參數：to、subject、body",
+        "Calendar or meeting": "行事曆或會議",
+        "Direct ask or deadline": "直接請你回或期限",
+        "Money or renewal": "金流或續約",
+        Promotion: "促銷",
+        "Automated notice": "自動通知",
+        "Unread, not obviously junk": "未讀，不像垃圾信",
+        "No hard action": "沒有硬性動作",
+        Calendar: "行事曆",
+        mailKind: "信件",
+        calendarKind: "行事曆",
+        noteKind: "筆記",
+      },
+      en: {
+        tagline: "Local mail brain. Bring your own agent.",
+        navDash: "Dashboard",
+        navMail: "Inbox",
+        navBrain: "Second Brain",
+        navPersona: "Know you better",
+        navAgent: "Agent",
+        search: "Search",
+        refresh: "Refresh",
+        searchPh: "Search mail, senders, second brain",
+        askPh: "Ask your agent. Morning brief, who is loud, draft a reply.",
+        skillLabel: "Skills · BYO agent",
+        runAgent: "Run agent",
+        saveDraft: "Save pane as draft",
+        loading: "loading",
+        refreshing: "refreshing",
+        agentSuffix: " agent",
+        mail: "Mail",
+        unread: "Unread",
+        brainCards: "Brain cards",
+        calendar: "Calendar",
+        needs_you: "Needs you",
+        upcoming: "Upcoming",
+        worth_a_look: "Worth a look",
+        fyi: "FYI",
+        other: "Cleanup",
+        dashTitle: "Dashboard",
+        dashLead: "Five-bucket triage plus Second Brain. Demo data loads on first run. Connect gog or gsk later.",
+        attention: "Attention now",
+        howWrite: "How you write",
+        emptyNeed: "Nothing in Needs you. Refresh or connect mail.",
+        none: "None",
+        inboxTitle: "Inbox",
+        inboxLead: "Click a thread. Send is off. Drafts stay on this machine.",
+        brainTitle: "Second Brain",
+        brainLead: "cards in vault/cards. Distilled from mail and calendar.",
+        personaTitle: "Know you better",
+        inboxHabits: "Inbox habits",
+        writing: "Writing",
+        facts: "Facts learned",
+        source: "source",
+        threads: "threads",
+        agentTitle: "Bring your own agent",
+        agentLead: "Default driver is local. Point agent.json at an OpenAI-compatible endpoint, a CLI, or an HTTP worker. Tools live at /api/v1/tools.",
+        contextHelp: "Persona, board, and recent mail for your own loop.",
+        running: "Agent running",
+        draftSaved: "Draft saved locally",
+        notFound: "not found",
+        "morning-brief": "Morning brief",
+        "catch-me-up": "Catch me up",
+        "categorize-inbox": "Categorize inbox",
+        "plan-my-week": "Plan my week",
+        "know-you-better": "Know you better",
+        list_inbox: "List recent mail. Args: q, category, limit",
+        brain_board: "Five-bucket triage board. Args: hours",
+        search_brain: "Search Second Brain cards. Args: q",
+        persona: "Read the know-you-better profile. Args: none",
+        save_draft: "Store a local draft. Never sends. Args: to, subject, body",
+        "Calendar or meeting": "Calendar or meeting",
+        "Direct ask or deadline": "Direct ask or deadline",
+        "Money or renewal": "Money or renewal",
+        Promotion: "Promotion",
+        "Automated notice": "Automated notice",
+        "Unread, not obviously junk": "Unread, not obviously junk",
+        "No hard action": "No hard action",
+        Calendar: "Calendar",
+        mailKind: "mail",
+        calendarKind: "calendar",
+        noteKind: "note",
+      },
+    };
+
+    const CATS = ["needs_you", "upcoming", "worth_a_look", "fyi", "other"];
+    const state = { view: "dash", overview: null, lang: pickLang() };
     const $ = (id) => document.getElementById(id);
+    const t = (k) => (I18N[state.lang] && I18N[state.lang][k]) || I18N.en[k] || k;
     const api = (p, o) => fetch(p, o).then((r) => r.json());
     const esc = (s) => String(s ?? "").replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
-    const names = { needs_you: "Needs you", upcoming: "Upcoming", worth_a_look: "Worth a look", fyi: "FYI", other: "Cleanup" };
 
-    async function boot() {
-      const ov = await api("/api/overview");
-      state.overview = ov;
-      $("status").textContent = (ov.agent && ov.agent.driver ? ov.agent.driver : "local") + " agent";
+    function pickLang() {
+      const q = new URLSearchParams(location.search).get("lang");
+      if (q === "en" || q === "zh-Hant") return q;
+      try {
+        const saved = localStorage.getItem("tpi-lang");
+        if (saved === "en" || saved === "zh-Hant") return saved;
+      } catch (_) {}
+      const nav = (navigator.language || "").toLowerCase();
+      return nav.startsWith("zh") ? "zh-Hant" : "en";
+    }
+
+    function setLang(lang) {
+      state.lang = lang === "en" ? "en" : "zh-Hant";
+      try { localStorage.setItem("tpi-lang", state.lang); } catch (_) {}
+      const url = new URL(location.href);
+      url.searchParams.set("lang", state.lang);
+      history.replaceState(null, "", url);
+      paintChrome();
+      if (state.overview) renderView();
+    }
+
+    function paintChrome() {
+      document.documentElement.lang = state.lang;
+      document.title = "TooPowerInbox";
+      $("tagline").textContent = t("tagline");
+      $("langZh").classList.toggle("on", state.lang === "zh-Hant");
+      $("langEn").classList.toggle("on", state.lang === "en");
+      document.querySelectorAll("[data-i18n]").forEach((el) => { el.textContent = t(el.dataset.i18n); });
+      $("q").placeholder = t("searchPh");
+      $("searchBtn").textContent = t("search");
+      $("syncBtn").textContent = t("refresh");
+      $("skillLabel").textContent = t("skillLabel");
+      $("ask").placeholder = t("askPh");
+      $("askBtn").textContent = t("runAgent");
+      $("draftBtn").textContent = t("saveDraft");
+      if (state.overview) paintOverviewBits();
+      else $("status").textContent = t("loading");
+    }
+
+    function catName(k) { return t(k); }
+    function reason(s) { return s ? t(s) : ""; }
+    function kindName(k) {
+      if (k === "calendar") return t("calendarKind");
+      if (k === "note") return t("noteKind");
+      if (k === "mail") return t("mailKind");
+      return k || "";
+    }
+
+    function paintOverviewBits() {
+      const ov = state.overview;
+      $("status").textContent = (ov.agent && ov.agent.driver ? ov.agent.driver : "local") + t("agentSuffix");
       $("stats").innerHTML = [
-        ["Mail", ov.counts.emails],
-        ["Unread", ov.counts.unread],
-        ["Brain cards", ov.brain.count],
-        ["Calendar", ov.counts.events],
+        [t("mail"), ov.counts.emails],
+        [t("unread"), ov.counts.unread],
+        [t("brainCards"), ov.brain.count],
+        [t("calendar"), ov.counts.events],
       ].map(([k, v]) => `<div class="stat"><b>${v}</b><span>${k}</span></div>`).join("");
       const counts = ov.board.counts || {};
       const max = Math.max(1, ...Object.values(counts));
-      $("bars").innerHTML = Object.keys(names).map((k) => {
+      $("bars").innerHTML = CATS.map((k) => {
         const n = counts[k] || 0;
-        return `<div class="bar-row"><div>${names[k]}</div><div class="bar"><i class="${k}" style="width:${Math.round(n / max * 100)}%"></i></div><div>${n}</div></div>`;
+        return `<div class="bar-row"><div>${catName(k)}</div><div class="bar"><i class="${k}" style="width:${Math.round(n / max * 100)}%"></i></div><div>${n}</div></div>`;
       }).join("");
-      $("skills").innerHTML = (ov.skills || []).map((s) => `<button class="btn" data-skill="${s.slug}">${esc(s.name)}</button>`).join("");
+      $("skills").innerHTML = (ov.skills || []).map((s) =>
+        `<button class="btn" data-skill="${s.slug}">${esc(t(s.slug))}</button>`).join("");
+    }
+
+    async function boot() {
+      paintChrome();
+      const ov = await api("/api/overview");
+      state.overview = ov;
+      paintOverviewBits();
       renderView();
     }
 
@@ -137,19 +343,20 @@
     function renderDash() {
       const ov = state.overview;
       const need = (ov.board.todos.needs_you || []).slice(0, 8);
-      $("list").innerHTML = need.map(itemRow).join("") || "<div class='pane muted'>Nothing in Needs you. Refresh or connect mail.</div>";
-      $("pane").innerHTML = `<h2>Dashboard</h2>
-        <p class="muted">Five-bucket triage plus Second Brain. Demo data loads on first run. Connect gog or gsk later.</p>
-        <div class="card"><strong>Attention now</strong><div class="muted">${(ov.persona.attention_now || []).map(esc).join("<br>") || "—"}</div></div>
-        <div class="card"><strong>How you write</strong><div class="muted">${(ov.persona.how_you_write || []).map(esc).join("<br>")}</div></div>`;
+      $("list").innerHTML = need.map(itemRow).join("") || `<div class="pane muted">${t("emptyNeed")}</div>`;
+      const att = (ov.persona.attention_now || []).map(esc).join("<br>") || t("none");
+      $("pane").innerHTML = `<h2>${t("dashTitle")}</h2>
+        <p class="muted">${t("dashLead")}</p>
+        <div class="card"><strong>${t("attention")}</strong><div class="muted">${att}</div></div>
+        <div class="card"><strong>${t("howWrite")}</strong><div class="muted">${(ov.persona.how_you_write || []).map(esc).join("<br>")}</div></div>`;
       bindListClicks();
     }
 
-    function itemRow(t) {
-      return `<div class="row" data-id="${esc(t.id)}" data-kind="${t.kind || "mail"}">
-        <div class="dot ${t.category}"></div>
-        <div><div class="from">${esc(t.from_addr || t.kind)}</div><div class="subj">${esc(t.text || t.title)}</div></div>
-        <div class="meta">${esc(t.flag_reason || "")}</div>
+    function itemRow(item) {
+      return `<div class="row" data-id="${esc(item.id)}" data-kind="${item.kind || "mail"}">
+        <div class="dot ${item.category}"></div>
+        <div><div class="from">${esc(item.from_addr || kindName(item.kind))}</div><div class="subj">${esc(item.text || item.title)}</div></div>
+        <div class="meta">${esc(reason(item.flag_reason))}</div>
       </div>`;
     }
 
@@ -162,7 +369,7 @@
           <div><div class="from">${esc(e.from_addr)}</div><div class="subj">${esc(e.subject)}</div></div>
           <div class="meta">${esc((e.date_raw || "").slice(0, 16))}</div>
         </div>`).join("");
-      $("pane").innerHTML = "<h2>Inbox</h2><p class='muted'>Click a thread. Send is off. Drafts stay on this machine.</p>";
+      $("pane").innerHTML = `<h2>${t("inboxTitle")}</h2><p class="muted">${t("inboxLead")}</p>`;
       bindListClicks();
     }
 
@@ -171,31 +378,31 @@
       $("list").innerHTML = cards.map((c) => `
         <div class="row" data-card="${esc(c.id)}">
           <div class="dot ${c.category || "fyi"}"></div>
-          <div><div class="from">${esc(c.kind)}</div><div class="subj">${esc(c.title)}</div></div>
-          <div class="meta">${esc(c.category || "")}</div>
+          <div><div class="from">${esc(kindName(c.kind))}</div><div class="subj">${esc(c.title)}</div></div>
+          <div class="meta">${esc(catName(c.category || "fyi"))}</div>
         </div>`).join("");
-      $("pane").innerHTML = `<h2>Second Brain</h2><p class="muted">${cards.length} cards in vault/cards. Distilled from mail and calendar.</p>
+      $("pane").innerHTML = `<h2>${t("brainTitle")}</h2><p class="muted">${cards.length} ${t("brainLead")}</p>
         ${cards.slice(0, 6).map((c) => `<div class="card"><strong>${esc(c.title)}</strong><div class="muted">${esc(c.body || "")}</div></div>`).join("")}`;
     }
 
     function renderPersona() {
       const p = state.overview.persona;
       $("list").innerHTML = (p.top_senders || []).map((s) => `
-        <div class="row"><div class="dot fyi"></div><div><div class="from">${esc(s.email)}</div><div class="subj">${s.count} threads</div></div></div>`).join("");
-      $("pane").innerHTML = `<h2>Know you better</h2>
-        <p>${esc(p.identity?.name)} · ${esc(p.identity?.role)}</p>
-        <div class="card"><strong>Inbox habits</strong><div class="muted">${(p.how_you_run_inbox || []).map(esc).join("<br>")}</div></div>
-        <div class="card"><strong>Writing</strong><div class="muted">${(p.how_you_write || []).map(esc).join("<br>")}</div></div>
-        <div class="card"><strong>Facts learned</strong> ${p.facts_learned || 0} · source ${esc(p.source)}</div>`;
+        <div class="row"><div class="dot fyi"></div><div><div class="from">${esc(s.email)}</div><div class="subj">${s.count} ${t("threads")}</div></div></div>`).join("");
+      $("pane").innerHTML = `<h2>${t("personaTitle")}</h2>
+        <p>${esc(p.identity && p.identity.name)} · ${esc(p.identity && p.identity.role)}</p>
+        <div class="card"><strong>${t("inboxHabits")}</strong><div class="muted">${(p.how_you_run_inbox || []).map(esc).join("<br>")}</div></div>
+        <div class="card"><strong>${t("writing")}</strong><div class="muted">${(p.how_you_write || []).map(esc).join("<br>")}</div></div>
+        <div class="card"><strong>${t("facts")}</strong> ${p.facts_learned || 0} · ${t("source")} ${esc(p.source)}</div>`;
     }
 
     function renderAgentHelp() {
-      $("list").innerHTML = (state.overview.tools || []).map((t) => `
-        <div class="row"><div class="dot look"></div><div><div class="from">${esc(t.name)}</div><div class="subj">${esc(t.description)}</div></div></div>`).join("");
-      $("pane").innerHTML = `<h2>Bring your own agent</h2>
-        <p class="muted">Default driver is <code>local</code>. Point agent.json at OpenAI-compatible, a CLI, or an HTTP worker. Tools live at <code>/api/v1/tools</code>.</p>
-        <div class="card"><strong>POST /api/v1/agent/run</strong><div class="muted">{ "ask": "…", "skill": "morning-brief", "driver": "local" }</div></div>
-        <div class="card"><strong>GET /api/v1/context</strong><div class="muted">Persona + board + recent mail for your own loop.</div></div>`;
+      $("list").innerHTML = (state.overview.tools || []).map((tool) => `
+        <div class="row"><div class="dot worth_a_look"></div><div><div class="from">${esc(tool.name)}</div><div class="subj">${esc(t(tool.name))}</div></div></div>`).join("");
+      $("pane").innerHTML = `<h2>${t("agentTitle")}</h2>
+        <p class="muted">${t("agentLead")}</p>
+        <div class="card"><strong>POST /api/v1/agent/run</strong><div class="muted">{ "ask": "...", "skill": "morning-brief", "driver": "local", "lang": "${state.lang}" }</div></div>
+        <div class="card"><strong>GET /api/v1/context</strong><div class="muted">${t("contextHelp")}</div></div>`;
     }
 
     function bindListClicks() {
@@ -204,9 +411,9 @@
         if (!row || !row.dataset.id) return;
         if (String(row.dataset.id).startsWith("cal:")) return;
         const item = await api("/api/thread/" + encodeURIComponent(row.dataset.id));
-        if (item.error) { $("pane").innerHTML = `<p class="muted">${esc(item.error)}</p>`; return; }
+        if (item.error) { $("pane").innerHTML = `<p class="muted">${esc(t("notFound"))}</p>`; return; }
         $("pane").innerHTML = `<h2>${esc(item.subject)}</h2>
-          <p class="muted">${esc(item.from_addr)} · ${esc(item.category)} · ${esc(item.flag_reason || "")}</p>
+          <p class="muted">${esc(item.from_addr)} · ${esc(catName(item.category))} · ${esc(reason(item.flag_reason))}</p>
           <div class="thread">${esc(item.body_text || item.snippet || "")}</div>`;
       };
     }
@@ -218,12 +425,15 @@
         renderView();
       };
     });
+    document.querySelectorAll(".lang button").forEach((b) => {
+      b.onclick = () => setLang(b.dataset.lang);
+    });
     $("syncBtn").onclick = async () => {
-      $("status").textContent = "refreshing…";
+      $("status").textContent = t("refreshing");
       await api("/api/sync", { method: "POST", headers: { "Content-Type": "application/json" }, body: "{}" });
       setTimeout(boot, 800);
     };
-    $("searchBtn").onclick = () => { state.view = "mail"; loadMail(); };
+    $("searchBtn").onclick = () => { state.view = "mail"; document.querySelectorAll(".nav button").forEach((x) => x.classList.toggle("on", x.dataset.view === "mail")); loadMail(); };
     $("q").addEventListener("keydown", (e) => { if (e.key === "Enter") loadMail(); });
     $("skills").onclick = (e) => {
       const b = e.target.closest("button[data-skill]");
@@ -232,17 +442,17 @@
     $("askBtn").onclick = () => runAgent("freeform", $("ask").value);
     $("draftBtn").onclick = async () => {
       const r = await api("/api/draft", { method: "POST", headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ subject: "OpenInbox draft", body: $("pane").innerText }) });
-      $("status").textContent = r.note || "draft saved";
+        body: JSON.stringify({ subject: "TooPowerInbox draft", body: $("pane").innerText, lang: state.lang }) });
+      $("status").textContent = r.note || t("draftSaved");
     };
 
     async function runAgent(skill, ask) {
-      $("pane").innerHTML = "<p class='muted'>Agent running…</p>";
+      $("pane").innerHTML = `<p class="muted">${t("running")}</p>`;
       const r = await api("/api/v1/agent/run", {
         method: "POST", headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ skill, ask }),
+        body: JSON.stringify({ skill, ask, lang: state.lang }),
       });
-      $("pane").innerHTML = `<h2>${esc(r.driver)} · ${esc(r.skill)}</h2><div class="thread">${esc(r.answer)}</div>`;
+      $("pane").innerHTML = `<h2>${esc(r.driver)} · ${esc(t(r.skill) === r.skill ? r.skill : t(r.skill))}</h2><div class="thread">${esc(r.answer)}</div>`;
     }
 
     boot();

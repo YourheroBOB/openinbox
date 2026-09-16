@@ -1,1 +1,1 @@
-# OpenInbox server package
+# TooPowerInbox server package
