@@ -1,0 +1,12 @@
+{
+  "mode": "demo",
+  "accounts": [
+    {
+      "email": "you@example.com",
+      "platform": "gmail",
+      "driver": "demo",
+      "label": "Demo inbox"
+    }
+  ],
+  "calendars": []
+}

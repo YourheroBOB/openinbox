@@ -1,0 +1,170 @@
+{
+  "persona_seed": {
+    "name": "Alex Chen",
+    "role": "Indie founder / operator",
+    "timezone": "Asia/Taipei",
+    "how_you_write": [
+      "Short paragraphs. Decision first, context second.",
+      "Signs as the person, not the company.",
+      "Asks one question per email when a reply is needed."
+    ],
+    "how_you_run_inbox": [
+      "Replies the same day to anything with a date or a name.",
+      "Newsletters wait until Friday.",
+      "Receipts are kept, promotions are deleted."
+    ],
+    "attention_now": [
+      "Seed round follow-up with Northwind",
+      "Vendor renewal on the 20th",
+      "Hiring a contract designer"
+    ]
+  },
+  "emails": [
+    {
+      "id": "demo:you@example.com:m1",
+      "account": "you@example.com",
+      "platform": "demo",
+      "thread_id": "m1",
+      "subject": "Can you confirm the Friday scope before we send the deck?",
+      "snippet": "Alex — we need a yes/no on the three slides by 17:00 Friday. If we slip, the investor call moves.",
+      "from_addr": "Samira Ortiz <samira@northwind.example>",
+      "to_addr": "you@example.com",
+      "date_raw": "2026-09-16 09:12",
+      "unread": true,
+      "has_attachment": false,
+      "labels": ["INBOX"],
+      "body_text": "Alex — we need a yes/no on the three slides by 17:00 Friday. If we slip, the investor call moves. Reply with confirm or the two lines you want cut."
+    },
+    {
+      "id": "demo:you@example.com:m2",
+      "account": "you@example.com",
+      "platform": "demo",
+      "thread_id": "m2",
+      "subject": "Action required: review the Gemini retirement schedule",
+      "snippet": "Please review the model retirement dates and confirm whether your agents must migrate.",
+      "from_addr": "Cloud Platform <noreply@cloud.example>",
+      "to_addr": "you@example.com",
+      "date_raw": "2026-09-16 08:40",
+      "unread": true,
+      "has_attachment": false,
+      "labels": ["INBOX"],
+      "body_text": "Please review the model retirement dates and confirm whether your agents must migrate before 30 September."
+    },
+    {
+      "id": "demo:you@example.com:m3",
+      "account": "you@example.com",
+      "platform": "demo",
+      "thread_id": "m3",
+      "subject": "Your receipt from Forge Tools #2709",
+      "snippet": "You paid USD 42.00 for Forge Tools Pro.",
+      "from_addr": "Forge Tools <billing@forgetools.example>",
+      "to_addr": "you@example.com",
+      "date_raw": "2026-09-16 00:59",
+      "unread": false,
+      "has_attachment": true,
+      "labels": ["INBOX"],
+      "body_text": "You paid USD 42.00 for Forge Tools Pro. Card ending 4242. Keep this receipt."
+    },
+    {
+      "id": "demo:you@example.com:m4",
+      "account": "you@example.com",
+      "platform": "demo",
+      "thread_id": "m4",
+      "subject": "Invitation: Design review Thursday 16:00",
+      "snippet": "Maya invited you to a 45 minute design review.",
+      "from_addr": "Maya Singh <maya@studio.example>",
+      "to_addr": "you@example.com",
+      "date_raw": "2026-09-15 18:22",
+      "unread": true,
+      "has_attachment": false,
+      "labels": ["INBOX"],
+      "body_text": "Maya invited you to a 45 minute design review on Thursday 16:00. Calendar invite attached."
+    },
+    {
+      "id": "demo:you@example.com:m5",
+      "account": "you@example.com",
+      "platform": "demo",
+      "thread_id": "m5",
+      "subject": "Weekly product changelog",
+      "snippet": "Loops for product management. Three features shipped.",
+      "from_addr": "Linear Changelog <changelog@updates.example>",
+      "to_addr": "you@example.com",
+      "date_raw": "2026-09-15 11:03",
+      "unread": false,
+      "has_attachment": false,
+      "labels": ["INBOX"],
+      "body_text": "Loops for product management. Three features shipped this week. Unsubscribe at the bottom."
+    },
+    {
+      "id": "demo:you@example.com:m6",
+      "account": "you@example.com",
+      "platform": "demo",
+      "thread_id": "m6",
+      "subject": "50% off workstation cables this week only",
+      "snippet": "Upgrade your desk. Limited time.",
+      "from_addr": "Kickstart Go <team@promo.example>",
+      "to_addr": "you@example.com",
+      "date_raw": "2026-09-15 07:10",
+      "unread": true,
+      "has_attachment": false,
+      "labels": ["INBOX", "CATEGORY_PROMOTIONS"],
+      "body_text": "Upgrade your desk. Limited time. Unsubscribe."
+    },
+    {
+      "id": "demo:you@example.com:m7",
+      "account": "you@example.com",
+      "platform": "demo",
+      "thread_id": "m7",
+      "subject": "Northwind term sheet comments",
+      "snippet": "Two clauses still open: pro-rata and the information right.",
+      "from_addr": "Samira Ortiz <samira@northwind.example>",
+      "to_addr": "you@example.com",
+      "date_raw": "2026-09-14 16:40",
+      "unread": false,
+      "has_attachment": true,
+      "labels": ["INBOX"],
+      "body_text": "Two clauses still open: pro-rata and the information right. Can you mark which one you will concede?"
+    },
+    {
+      "id": "demo:you@example.com:m8",
+      "account": "you@example.com",
+      "platform": "demo",
+      "thread_id": "m8",
+      "subject": "Auto-renewal reminder",
+      "snippet": "1 resource renews on 2026-09-20. Please ensure sufficient balance.",
+      "from_addr": "Byte Cloud <noreply@bytecloud.example>",
+      "to_addr": "you@example.com",
+      "date_raw": "2026-09-14 09:30",
+      "unread": true,
+      "has_attachment": false,
+      "labels": ["INBOX"],
+      "body_text": "1 resource renews on 2026-09-20. Please ensure sufficient balance or cancel auto-renewal."
+    }
+  ],
+  "events": [
+    {
+      "id": "demo-cal-1",
+      "calendar_id": "demo",
+      "title": "Northwind investor call",
+      "start_local": "2026-09-19T10:00:00+08:00",
+      "end_local": "2026-09-19T10:45:00+08:00",
+      "all_day": 0
+    },
+    {
+      "id": "demo-cal-2",
+      "calendar_id": "demo",
+      "title": "Design review with Maya",
+      "start_local": "2026-09-18T16:00:00+08:00",
+      "end_local": "2026-09-18T16:45:00+08:00",
+      "all_day": 0
+    },
+    {
+      "id": "demo-cal-3",
+      "calendar_id": "demo",
+      "title": "Vendor renewal (Byte Cloud)",
+      "start_local": "2026-09-20",
+      "end_local": "2026-09-21",
+      "all_day": 1
+    }
+  ]
+}

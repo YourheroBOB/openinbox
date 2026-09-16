@@ -1,0 +1,251 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>OpenInbox</title>
+  <style>
+    :root {
+      --bg: #12110f; --panel: #1b1916; --ink: #f4efe6; --muted: #9b9286;
+      --line: #2d2924; --accent: #c4a574; --need: #d27a5a; --look: #c4a574;
+      --fyi: #8a9aa8; --other: #6b6560; --up: #7ea07a;
+    }
+    * { box-sizing: border-box; }
+    html, body { margin: 0; height: 100%; background: var(--bg); color: var(--ink);
+      font: 15px/1.45 "Iowan Old Style", "Source Han Serif TC", Georgia, serif; }
+    button, input, textarea { font: inherit; }
+    button { cursor: pointer; }
+    #app { display: grid; grid-template-columns: 220px 1fr 400px; height: 100vh; }
+    aside { border-right: 1px solid var(--line); padding: 18px 14px; display: flex; flex-direction: column; gap: 14px; }
+    .brand { font-size: 20px; letter-spacing: .04em; }
+    .brand small { display: block; color: var(--muted); font-size: 12px; margin-top: 4px; }
+    .nav button { width: 100%; text-align: left; background: transparent; color: var(--ink);
+      border: 1px solid transparent; padding: 8px 10px; border-radius: 6px; }
+    .nav button.on { background: #26211c; border-color: var(--line); }
+    .label { color: var(--muted); font-size: 11px; letter-spacing: .08em; text-transform: uppercase; }
+    main { display: flex; flex-direction: column; min-width: 0; border-right: 1px solid var(--line); }
+    .toolbar { display: flex; gap: 8px; align-items: center; padding: 12px 14px; border-bottom: 1px solid var(--line); }
+    .toolbar input { flex: 1; background: var(--panel); color: var(--ink); border: 1px solid var(--line); padding: 8px 10px; border-radius: 6px; }
+    button.btn { background: var(--panel); color: var(--ink); border: 1px solid var(--line); padding: 7px 12px; border-radius: 6px; }
+    button.primary { background: var(--accent); color: #1a140c; border-color: var(--accent); }
+    .stats { display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; padding: 12px 14px; }
+    .stat { border: 1px solid var(--line); border-radius: 8px; padding: 10px 12px; }
+    .stat b { display: block; font-size: 22px; }
+    .stat span { color: var(--muted); font-size: 12px; }
+    .bars { padding: 0 14px 12px; }
+    .bar-row { display: grid; grid-template-columns: 110px 1fr 36px; gap: 8px; align-items: center; margin: 6px 0; }
+    .bar { height: 10px; background: #2a261f; border-radius: 99px; overflow: hidden; }
+    .bar i { display: block; height: 100%; }
+    .bar i.needs_you { background: var(--need); }
+    .bar i.upcoming { background: var(--up); }
+    .bar i.worth_a_look { background: var(--look); }
+    .bar i.fyi { background: var(--fyi); }
+    .bar i.other { background: var(--other); }
+    .list { overflow: auto; flex: 1; }
+    .row { display: grid; grid-template-columns: 14px 1fr auto; gap: 10px; padding: 10px 14px; border-bottom: 1px solid var(--line); cursor: pointer; }
+    .row:hover, .row.on { background: #201c18; }
+    .dot { width: 8px; height: 8px; border-radius: 50%; margin-top: 7px; background: var(--other); }
+    .dot.needs_you { background: var(--need); } .dot.worth_a_look { background: var(--look); }
+    .dot.fyi { background: var(--fyi); } .dot.upcoming { background: var(--up); }
+    .from { font-weight: 550; } .row.unread .from { font-weight: 700; }
+    .subj, .meta { color: var(--muted); font-size: 13px; }
+    .subj { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    section { display: flex; flex-direction: column; background: #171410; min-width: 0; }
+    .pane { padding: 16px 18px; overflow: auto; flex: 1; }
+    h2 { font-size: 17px; margin: 0 0 8px; }
+    .muted { color: var(--muted); }
+    .card { border: 1px solid var(--line); border-radius: 8px; padding: 10px 12px; margin: 0 0 10px; }
+    .agent { border-top: 1px solid var(--line); padding: 12px; display: flex; flex-direction: column; gap: 8px; }
+    .agent textarea { height: 70px; background: var(--panel); color: var(--ink); border: 1px solid var(--line); border-radius: 6px; padding: 8px; }
+    .skills { display: flex; flex-wrap: wrap; gap: 6px; }
+    .skills button { width: auto; }
+    .thread { white-space: pre-wrap; }
+    .status { color: var(--muted); font-size: 12px; }
+  </style>
+</head>
+<body>
+  <div id="app">
+    <aside>
+      <div class="brand">OpenInbox<small>Local mail brain. Bring your own agent.</small></div>
+      <div class="nav">
+        <button class="on" data-view="dash">Dashboard</button>
+        <button data-view="mail">Inbox</button>
+        <button data-view="brain">Second Brain</button>
+        <button data-view="persona">Know you better</button>
+        <button data-view="agent">Agent</button>
+      </div>
+      <div class="status" id="status">loading</div>
+    </aside>
+    <main>
+      <div class="toolbar">
+        <input id="q" placeholder="Search mail, senders, second brain" />
+        <button class="btn" id="searchBtn">Search</button>
+        <button class="btn primary" id="syncBtn">Refresh</button>
+      </div>
+      <div class="stats" id="stats"></div>
+      <div class="bars" id="bars"></div>
+      <div class="list" id="list"></div>
+    </main>
+    <section>
+      <div class="pane" id="pane"></div>
+      <div class="agent">
+        <div class="label">Skills · BYO agent</div>
+        <div class="skills" id="skills"></div>
+        <textarea id="ask" placeholder="Ask your agent. Morning brief, who is loud, draft a reply…"></textarea>
+        <div>
+          <button class="btn primary" id="askBtn">Run agent</button>
+          <button class="btn" id="draftBtn">Save pane as draft</button>
+        </div>
+      </div>
+    </section>
+  </div>
+  <script>
+    const state = { view: "dash", overview: null, selected: null };
+    const $ = (id) => document.getElementById(id);
+    const api = (p, o) => fetch(p, o).then((r) => r.json());
+    const esc = (s) => String(s ?? "").replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
+    const names = { needs_you: "Needs you", upcoming: "Upcoming", worth_a_look: "Worth a look", fyi: "FYI", other: "Cleanup" };
+
+    async function boot() {
+      const ov = await api("/api/overview");
+      state.overview = ov;
+      $("status").textContent = (ov.agent && ov.agent.driver ? ov.agent.driver : "local") + " agent";
+      $("stats").innerHTML = [
+        ["Mail", ov.counts.emails],
+        ["Unread", ov.counts.unread],
+        ["Brain cards", ov.brain.count],
+        ["Calendar", ov.counts.events],
+      ].map(([k, v]) => `<div class="stat"><b>${v}</b><span>${k}</span></div>`).join("");
+      const counts = ov.board.counts || {};
+      const max = Math.max(1, ...Object.values(counts));
+      $("bars").innerHTML = Object.keys(names).map((k) => {
+        const n = counts[k] || 0;
+        return `<div class="bar-row"><div>${names[k]}</div><div class="bar"><i class="${k}" style="width:${Math.round(n / max * 100)}%"></i></div><div>${n}</div></div>`;
+      }).join("");
+      $("skills").innerHTML = (ov.skills || []).map((s) => `<button class="btn" data-skill="${s.slug}">${esc(s.name)}</button>`).join("");
+      renderView();
+    }
+
+    function renderView() {
+      if (state.view === "dash") return renderDash();
+      if (state.view === "mail") return loadMail();
+      if (state.view === "brain") return renderBrain();
+      if (state.view === "persona") return renderPersona();
+      if (state.view === "agent") return renderAgentHelp();
+    }
+
+    function renderDash() {
+      const ov = state.overview;
+      const need = (ov.board.todos.needs_you || []).slice(0, 8);
+      $("list").innerHTML = need.map(itemRow).join("") || "<div class='pane muted'>Nothing in Needs you. Refresh or connect mail.</div>";
+      $("pane").innerHTML = `<h2>Dashboard</h2>
+        <p class="muted">Five-bucket triage plus Second Brain. Demo data loads on first run. Connect gog or gsk later.</p>
+        <div class="card"><strong>Attention now</strong><div class="muted">${(ov.persona.attention_now || []).map(esc).join("<br>") || "—"}</div></div>
+        <div class="card"><strong>How you write</strong><div class="muted">${(ov.persona.how_you_write || []).map(esc).join("<br>")}</div></div>`;
+      bindListClicks();
+    }
+
+    function itemRow(t) {
+      return `<div class="row" data-id="${esc(t.id)}" data-kind="${t.kind || "mail"}">
+        <div class="dot ${t.category}"></div>
+        <div><div class="from">${esc(t.from_addr || t.kind)}</div><div class="subj">${esc(t.text || t.title)}</div></div>
+        <div class="meta">${esc(t.flag_reason || "")}</div>
+      </div>`;
+    }
+
+    async function loadMail() {
+      const q = $("q").value.trim();
+      const data = await api("/api/inbox?limit=80" + (q ? "&q=" + encodeURIComponent(q) : ""));
+      $("list").innerHTML = (data.emails || []).map((e) => `
+        <div class="row ${e.unread ? "unread" : ""}" data-id="${esc(e.id)}">
+          <div class="dot ${e.category}"></div>
+          <div><div class="from">${esc(e.from_addr)}</div><div class="subj">${esc(e.subject)}</div></div>
+          <div class="meta">${esc((e.date_raw || "").slice(0, 16))}</div>
+        </div>`).join("");
+      $("pane").innerHTML = "<h2>Inbox</h2><p class='muted'>Click a thread. Send is off. Drafts stay on this machine.</p>";
+      bindListClicks();
+    }
+
+    function renderBrain() {
+      const cards = (state.overview.brain.cards || []);
+      $("list").innerHTML = cards.map((c) => `
+        <div class="row" data-card="${esc(c.id)}">
+          <div class="dot ${c.category || "fyi"}"></div>
+          <div><div class="from">${esc(c.kind)}</div><div class="subj">${esc(c.title)}</div></div>
+          <div class="meta">${esc(c.category || "")}</div>
+        </div>`).join("");
+      $("pane").innerHTML = `<h2>Second Brain</h2><p class="muted">${cards.length} cards in vault/cards. Distilled from mail and calendar.</p>
+        ${cards.slice(0, 6).map((c) => `<div class="card"><strong>${esc(c.title)}</strong><div class="muted">${esc(c.body || "")}</div></div>`).join("")}`;
+    }
+
+    function renderPersona() {
+      const p = state.overview.persona;
+      $("list").innerHTML = (p.top_senders || []).map((s) => `
+        <div class="row"><div class="dot fyi"></div><div><div class="from">${esc(s.email)}</div><div class="subj">${s.count} threads</div></div></div>`).join("");
+      $("pane").innerHTML = `<h2>Know you better</h2>
+        <p>${esc(p.identity?.name)} · ${esc(p.identity?.role)}</p>
+        <div class="card"><strong>Inbox habits</strong><div class="muted">${(p.how_you_run_inbox || []).map(esc).join("<br>")}</div></div>
+        <div class="card"><strong>Writing</strong><div class="muted">${(p.how_you_write || []).map(esc).join("<br>")}</div></div>
+        <div class="card"><strong>Facts learned</strong> ${p.facts_learned || 0} · source ${esc(p.source)}</div>`;
+    }
+
+    function renderAgentHelp() {
+      $("list").innerHTML = (state.overview.tools || []).map((t) => `
+        <div class="row"><div class="dot look"></div><div><div class="from">${esc(t.name)}</div><div class="subj">${esc(t.description)}</div></div></div>`).join("");
+      $("pane").innerHTML = `<h2>Bring your own agent</h2>
+        <p class="muted">Default driver is <code>local</code>. Point agent.json at OpenAI-compatible, a CLI, or an HTTP worker. Tools live at <code>/api/v1/tools</code>.</p>
+        <div class="card"><strong>POST /api/v1/agent/run</strong><div class="muted">{ "ask": "…", "skill": "morning-brief", "driver": "local" }</div></div>
+        <div class="card"><strong>GET /api/v1/context</strong><div class="muted">Persona + board + recent mail for your own loop.</div></div>`;
+    }
+
+    function bindListClicks() {
+      $("list").onclick = async (ev) => {
+        const row = ev.target.closest(".row");
+        if (!row || !row.dataset.id) return;
+        if (String(row.dataset.id).startsWith("cal:")) return;
+        const item = await api("/api/thread/" + encodeURIComponent(row.dataset.id));
+        if (item.error) { $("pane").innerHTML = `<p class="muted">${esc(item.error)}</p>`; return; }
+        $("pane").innerHTML = `<h2>${esc(item.subject)}</h2>
+          <p class="muted">${esc(item.from_addr)} · ${esc(item.category)} · ${esc(item.flag_reason || "")}</p>
+          <div class="thread">${esc(item.body_text || item.snippet || "")}</div>`;
+      };
+    }
+
+    document.querySelectorAll(".nav button").forEach((b) => {
+      b.onclick = () => {
+        state.view = b.dataset.view;
+        document.querySelectorAll(".nav button").forEach((x) => x.classList.toggle("on", x === b));
+        renderView();
+      };
+    });
+    $("syncBtn").onclick = async () => {
+      $("status").textContent = "refreshing…";
+      await api("/api/sync", { method: "POST", headers: { "Content-Type": "application/json" }, body: "{}" });
+      setTimeout(boot, 800);
+    };
+    $("searchBtn").onclick = () => { state.view = "mail"; loadMail(); };
+    $("q").addEventListener("keydown", (e) => { if (e.key === "Enter") loadMail(); });
+    $("skills").onclick = (e) => {
+      const b = e.target.closest("button[data-skill]");
+      if (b) runAgent(b.dataset.skill, "");
+    };
+    $("askBtn").onclick = () => runAgent("freeform", $("ask").value);
+    $("draftBtn").onclick = async () => {
+      const r = await api("/api/draft", { method: "POST", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ subject: "OpenInbox draft", body: $("pane").innerText }) });
+      $("status").textContent = r.note || "draft saved";
+    };
+
+    async function runAgent(skill, ask) {
+      $("pane").innerHTML = "<p class='muted'>Agent running…</p>";
+      const r = await api("/api/v1/agent/run", {
+        method: "POST", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ skill, ask }),
+      });
+      $("pane").innerHTML = `<h2>${esc(r.driver)} · ${esc(r.skill)}</h2><div class="thread">${esc(r.answer)}</div>`;
+    }
+
+    boot();
+  </script>
+</body>
+</html>

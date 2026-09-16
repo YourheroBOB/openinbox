@@ -1,0 +1,17 @@
+{
+  "driver": "local",
+  "comment": "local always works. Switch to openai_compatible, cli, or http to bring your own agent.",
+  "openai_compatible": {
+    "base_url": "http://127.0.0.1:11434/v1",
+    "model": "llama3.1",
+    "api_key_env": "OPENAI_API_KEY"
+  },
+  "cli": {
+    "command": ["claude", "-p"],
+    "timeout_sec": 120
+  },
+  "http": {
+    "url": "http://127.0.0.1:9000/agent",
+    "timeout_sec": 60
+  }
+}

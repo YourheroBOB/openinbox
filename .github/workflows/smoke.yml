@@ -1,0 +1,24 @@
+name: smoke
+on:
+  push:
+  pull_request:
+jobs:
+  demo:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - run: ./install.sh
+      - run: OPENINBOX_NO_BROWSER=1 ./run.sh &
+      - run: |
+          for i in 1 2 3 4 5 6 7 8; do
+            curl -fsS http://127.0.0.1:8770/api/health && exit 0
+            sleep 1
+          done
+          exit 1
+      - run: |
+          curl -fsS -X POST http://127.0.0.1:8770/api/v1/agent/run \
+            -H 'Content-Type: application/json' \
+            -d '{"skill":"morning-brief"}' | python3 -c 'import json,sys; d=json.load(sys.stdin); assert "Needs you" in d["answer"]'
