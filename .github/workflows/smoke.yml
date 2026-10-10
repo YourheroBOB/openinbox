@@ -35,6 +35,16 @@ jobs:
           zh = run({"skill": "morning-brief", "lang": "zh-Hant"})
           assert "Needs you" in en["answer"]
           assert "需要你" in zh["answer"]
+          def copilot(body):
+              req = urllib.request.Request(
+                  "http://127.0.0.1:8770/api/copilot",
+                  data=json.dumps(body).encode(),
+                  headers={"Content-Type": "application/json"},
+                  method="POST",
+              )
+              return json.loads(urllib.request.urlopen(req).read())
+          co = copilot({"mode": "summarize", "lang": "en"})
+          assert co.get("mode") == "summarize" and len(co.get("text") or "") > 10
           html = urllib.request.urlopen("http://127.0.0.1:8770/").read().decode()
           assert "TooPowerInbox" in html and "繁中" in html
           PY
