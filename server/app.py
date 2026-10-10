@@ -9,7 +9,7 @@ import threading
 import webbrowser
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
-from urllib.parse import parse_qs, urlparse
+from urllib.parse import parse_qs, unquote, urlparse
 
 HERE = Path(__file__).resolve().parent
 ROOT = HERE.parent
@@ -100,8 +100,20 @@ class Handler(BaseHTTPRequestHandler):
             return json_ok(self, {"emails": yhbmail.list_emails(
                 account=q.get("account"), category=q.get("category"),
                 q=q.get("q"), limit=int(q.get("limit") or 80))})
+        if path == "/api/accounts":
+            cfg = yhbmail.load_cfg()
+            return json_ok(self, {
+                "mode": cfg.get("mode") or "demo",
+                "accounts": [
+                    {"label": a.get("label") or (a.get("email") or "").split("@")[0],
+                     "email": a.get("email") or "", "driver": a.get("driver") or "demo"}
+                    for a in (cfg.get("accounts") or [])
+                ],
+            })
+        if path == "/api/drafts":
+            return json_ok(self, {"drafts": yhbmail.list_drafts()})
         if path.startswith("/api/thread/"):
-            item = yhbmail.get_email(path[len("/api/thread/"):])
+            item = yhbmail.get_email(unquote(path[len("/api/thread/"):]))
             return json_ok(self, item or {"error": "not found"}, 200 if item else 404)
         if path == "/api/brain":
             return json_ok(self, yhbmail.brain_board(int(q.get("hours") or 168)))
@@ -146,6 +158,26 @@ class Handler(BaseHTTPRequestHandler):
         if path == "/api/second-brain":
             return json_ok(self, second_brain.add_card(
                 body.get("title") or "note", body.get("body") or "", body.get("kind") or "note"))
+        if path == "/api/copilot":
+            history = body.get("history") or []
+            if not isinstance(history, list):
+                history = []
+            history = [
+                {"role": h.get("role") or "user", "text": str(h.get("text") or "")[:2000]}
+                for h in history if isinstance(h, dict) and (h.get("text") or "").strip()
+            ][-8:]
+            return json_ok(self, agent_bridge.run_copilot(
+                mode=(body.get("mode") or "chat").strip(),
+                ask=(body.get("ask") or "").strip(),
+                item_id=(body.get("item_id") or "").strip(),
+                history=history,
+                lang=body.get("lang") or "en"))
+        if path == "/api/read":
+            item_id = (body.get("id") or "").strip()
+            if not item_id:
+                return json_ok(self, {"error": "missing id"}, 400)
+            changed = yhbmail.set_unread(item_id, bool(body.get("unread")))
+            return json_ok(self, {"ok": True, "id": item_id, "unread": bool(body.get("unread")), "changed": changed})
         if path == "/api/draft":
             return json_ok(self, yhbmail.save_draft(
                 body.get("account") or "you@example.com", body.get("to") or "",
@@ -154,6 +186,19 @@ class Handler(BaseHTTPRequestHandler):
         if path == "/api/rebuild":
             persona.rebuild()
             return json_ok(self, second_brain.rebuild())
+        return json_ok(self, {"error": "not found"}, 404)
+
+    def do_DELETE(self):
+        parsed = urlparse(self.path)
+        q = {k: v[0] for k, v in parse_qs(parsed.query).items()}
+        if parsed.path == "/api/draft":
+            try:
+                draft_id = int(q.get("id") or 0)
+            except ValueError:
+                return json_ok(self, {"error": "bad id"}, 400)
+            if not draft_id:
+                return json_ok(self, {"error": "missing id"}, 400)
+            return json_ok(self, {"ok": True, "deleted": draft_id, "changed": yhbmail.delete_draft(draft_id)})
         return json_ok(self, {"error": "not found"}, 404)
 
 

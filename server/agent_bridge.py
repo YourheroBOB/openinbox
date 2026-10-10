@@ -8,17 +8,55 @@ Drivers in agent.json:
 """
 from __future__ import annotations
 
+import http.client
+import ipaddress
 import json
 import os
+import socket
 import subprocess
-import urllib.error
-import urllib.request
+import urllib.parse
 from pathlib import Path
 
 from yhbmail import ROOT, brain_board, list_emails, now_iso
 
 AGENT_PATH = ROOT / "agent.json"
 SKILLS_DIR = ROOT / "skills"
+
+
+def _safe_url(url: str, allow_private: bool = False) -> str:
+    """Validate an agent endpoint before any request.
+
+    Default deny: only public https endpoints are accepted. Loopback /
+    private / link-local targets are refused unless the operator
+    explicitly sets `"allow_private": true` in that agent.json block
+    (e.g. a local ollama on 127.0.0.1:11434). Plain http to a public
+    host is always refused (cleartext credentials). Hosts whose DNS
+    answer mixes public and private addresses are refused as well.
+    """
+    try:
+        parts = urllib.parse.urlsplit(url)
+    except Exception:
+        raise RuntimeError("bad agent url")
+    if parts.scheme not in ("http", "https") or not parts.hostname:
+        raise RuntimeError("agent url must be http(s) with a host")
+    host = parts.hostname
+    try:
+        infos = socket.getaddrinfo(host, None)
+    except Exception:
+        raise RuntimeError(f"cannot resolve agent host: {host}")
+    try:
+        ips = [ipaddress.ip_address(i[4][0].split("%")[0]) for i in infos]
+    except ValueError:
+        raise RuntimeError(f"bad address for agent host: {host}")
+    if any(not ip.is_global for ip in ips) and not allow_private:
+        raise RuntimeError(
+            "agent endpoint resolves to a loopback/private address; "
+            "set \"allow_private\": true in agent.json if this is your own local server")
+    if not all(ip.is_global for ip in ips) and parts.scheme == "http" and allow_private:
+        pass  # explicit local http (e.g. ollama); operator opted in
+    elif parts.scheme == "http":
+        raise RuntimeError("http:// agent endpoints are not allowed for public hosts; use https")
+    return url
 
 TOOLS = [
     {"name": "list_inbox", "description": "List recent mail. Args: q, category, limit"},
@@ -151,6 +189,29 @@ def _local_answer(pack: dict) -> str:
     return "\n".join(lines)
 
 
+def _post_json(url: str, headers: dict, body: bytes, timeout: int = 90, allow_private: bool = False) -> dict:
+    """POST JSON over http.client after _safe_url validation. Single network chokepoint."""
+    parts = urllib.parse.urlsplit(_safe_url(url, allow_private=allow_private))
+    conn = http.client.HTTPConnection(parts.hostname, parts.port or (443 if parts.scheme == "https" else 80), timeout=timeout)
+    if parts.scheme == "https":
+        conn = http.client.HTTPSConnection(parts.hostname, parts.port or 443, timeout=timeout)
+    try:
+        path = parts.path or "/"
+        if parts.query:
+            path += "?" + parts.query
+        conn.request("POST", path, body=body, headers=headers)
+        resp = conn.getresponse()
+        raw = resp.read().decode("utf-8", "replace")
+        if resp.status != 200:
+            raise RuntimeError(f"agent endpoint HTTP {resp.status}: {raw[:200]}")
+        return json.loads(raw)
+    finally:
+        try:
+            conn.close()
+        except Exception:
+            pass
+
+
 def _openai(pack: dict, cfg: dict) -> str:
     block = cfg.get("openai_compatible") or {}
     base = (block.get("base_url") or "").rstrip("/")
@@ -165,14 +226,10 @@ def _openai(pack: dict, cfg: dict) -> str:
         ],
         "temperature": 0.2,
     }).encode()
-    req = urllib.request.Request(
+    data = _post_json(
         f"{base}/chat/completions",
-        data=body,
-        headers={"Content-Type": "application/json", **({"Authorization": f"Bearer {key}"} if key else {})},
-        method="POST",
-    )
-    with urllib.request.urlopen(req, timeout=90) as resp:
-        data = json.loads(resp.read().decode())
+        {"Content-Type": "application/json", **({"Authorization": f"Bearer {key}"} if key else {})},
+        body, timeout=90, allow_private=bool(block.get("allow_private")))
     return data["choices"][0]["message"]["content"]
 
 
@@ -192,19 +249,14 @@ def _http(pack: dict, cfg: dict) -> str:
     url = block.get("url")
     if not url:
         raise RuntimeError("agent.json http.url is empty")
-    req = urllib.request.Request(
-        url,
-        data=json.dumps(pack, ensure_ascii=False).encode(),
-        headers={"Content-Type": "application/json"},
-        method="POST",
-    )
-    with urllib.request.urlopen(req, timeout=int(block.get("timeout_sec") or 60)) as resp:
-        raw = resp.read().decode()
+    raw_body = json.dumps(pack, ensure_ascii=False).encode()
     try:
-        data = json.loads(raw)
-        return data.get("answer") or data.get("text") or raw
+        data = _post_json(url, {"Content-Type": "application/json"}, raw_body,
+                          timeout=int(block.get("timeout_sec") or 60),
+                          allow_private=bool(block.get("allow_private")))
+        return data.get("answer") or data.get("text") or json.dumps(data, ensure_ascii=False)
     except json.JSONDecodeError:
-        return raw
+        raise RuntimeError("agent http worker returned non-JSON")
 
 
 def run_agent(ask: str = "", skill: str = "", driver: str | None = None, lang: str = "en") -> dict:
@@ -260,3 +312,178 @@ def invoke_tool(name: str, args: dict | None = None) -> dict:
                           args.get("subject") or "", args.get("body") or "",
                           lang=args.get("lang") or "en")
     return {"error": f"unknown tool {name}", "tools": TOOLS}
+
+
+# ───────────────────────── Copilot (GenMAIL-style) ─────────────────────────
+
+COPILOT_SYSTEM = {
+    "zh": (
+        "你是 TooPowerInbox 的信箱 Copilot，運行在使用者自己的電腦上（BYO agent）。"
+        "原則：一、用繁體中文與全形標點，精簡、條列優先，直接給可行動建議。"
+        "二、你看到的是本機快取的信件內容與摘要，僅供協助整理判讀。"
+        "三、你產出的回信一律是本機草稿，絕不自動寄出，永不宣稱已寄出。"
+        "四、涉及期限時明確標示日期，並提醒以原始信件與正式文件為準。"
+        "五、資訊不足就直說缺什麼，不要編造；人名、金額、日期只從提供的內容抄錄。"
+    ),
+    "en": (
+        "You are the TooPowerInbox Copilot, running locally on the user's own machine (BYO agent). "
+        "Rules: 1) Be concise, prefer bullets, give actionable next steps. "
+        "2) You see locally cached mail content for triage help only. "
+        "3) Every reply you write is a local draft; never send, never claim to have sent. "
+        "4) Spell out deadlines explicitly; defer to the original message for authority. "
+        "5) Never invent names, amounts, or dates; copy them only from the provided content."
+    ),
+}
+
+COPILOT_MODES = {
+    "zh": {
+        "summarize": (
+            "請用 30 秒能讀完的摘要整理這封信：一、這是誰為了什麼事寫來；"
+            "二、具體要求或通知什麼；三、有沒有期限或需要回覆的動作；四、建議的下一步。用短條列。"
+        ),
+        "todos": (
+            "請萃取待辦與期限，每項一行「期限｜事項｜來源」，日期用 YYYY/MM/DD，"
+            "沒有期限就寫「無明確期限」。最後一行總結最急的是哪一項。沒有待辦就明說。"
+        ),
+        "draft": (
+            "請產生三版回信草稿，用「## A」「## B」「## C」分節："
+            "A＝快速確認（二到三句）；B＝完整回覆（要點條列、交代進度與下一步）；"
+            "C＝婉拒或請求延後（禮貌、具體理由、替代方案或新期限）。"
+            "繁體中文、全形標點、專業但不僵硬、不用 emoji。這些草稿只會存本機。"
+        ),
+    },
+    "en": {
+        "summarize": (
+            "Summarize this email in a 30-second read: who wrote about what; "
+            "the concrete ask or notice; any deadline or reply expected; suggested next step. Short bullets."
+        ),
+        "todos": (
+            "Extract action items and deadlines, one per line as 'deadline | item | source', "
+            "dates as YYYY/MM/DD (or 'no explicit deadline'). End with the single most urgent item. Say so if none."
+        ),
+        "draft": (
+            "Write three reply drafts, sections '## A' '## B' '## C': "
+            "A = quick acknowledgment (2-3 sentences); B = full reply (bulleted points, status, next step); "
+            "C = polite decline or request to defer (reason + alternative/new date). "
+            "Professional, no emoji. Drafts stay local and are never sent."
+        ),
+    },
+}
+
+
+def copilot_thread_context(item_id: str) -> str:
+    from yhbmail import get_email
+    item = get_email(item_id) if item_id else None
+    if not item:
+        return ""
+    body = (item.get("body_text") or item.get("snippet") or "")[:6000]
+    return (
+        f"Subject: {item.get('subject') or ''}\n"
+        f"From: {item.get('from_addr') or ''}\n"
+        f"To: {item.get('to_addr') or ''}\n"
+        f"Date: {item.get('date_raw') or ''}\n"
+        f"Account: {item.get('account') or ''} (bucket: {item.get('category')})\n\n{body}"
+    )
+
+
+def copilot_digest(hours: int = 72) -> str:
+    board = brain_board(hours)
+    counts = board["counts"]
+    lines = [f"Inbox last {hours}h: " + ", ".join(f"{t['id']}={counts.get(t['id'], 0)}" for t in board["taxonomy"])]
+    for t in board["taxonomy"]:
+        items = (board["todos"].get(t["id"]) or [])[:6]
+        if items:
+            lines.append(f"[{t['name']}]")
+            for x in items:
+                lines.append(f"- {x['text']} ({x.get('from_addr')})")
+    return "\n".join(lines)[:2500]
+
+
+def _copilot_local(mode: str, ask: str, item_id: str, lang: str) -> str:
+    from yhbmail import get_email
+    zh = _zh(lang)
+    item = get_email(item_id) if item_id else None
+    if item and mode == "summarize":
+        return ("（本機啟發式，未接 LLM）\n" if zh else "(local heuristic, no LLM wired)\n") + (
+            f"Subject: {item.get('subject')}\nFrom: {item.get('from_addr')}\n"
+            f"Body: {(item.get('body_text') or item.get('snippet') or '')[:800]}"
+        )
+    if item and mode == "todos":
+        hits = [ln for ln in (item.get("body_text") or "").splitlines() if ACTION_RE.search(ln)][:6] if item else []
+        return "\n".join(hits) or ("規則沒掃到明確待辦。" if zh else "No explicit action items matched by rules.")
+    if item and mode == "draft":
+        who = (item.get("from_addr") or "there").split("<")[0].strip() or "there"
+        return (
+            f"Hi {who},\n\nThanks for your note — confirming receipt. "
+            "I'll follow up shortly with specifics.\n\n(heuristic draft; wire an LLM in agent.json for quality)"
+        ) if not zh else (
+            f"{who} 您好：\n\n已收到您的來信，我們已著手處理，稍後再回覆具體細節。\n\n（啟發式草稿；在 agent.json 接上 LLM 可提升品質）"
+        )
+    return _local_answer(context_pack(ask=ask or mode, skill="", lang=lang))
+
+
+def run_copilot(mode: str = "chat", ask: str = "", item_id: str = "",
+                history: list | None = None, lang: str = "en") -> dict:
+    zh = _zh(lang)
+    syshint = "zh" if zh else "en"
+    if mode in ("summarize", "todos", "draft"):
+        user = COPILOT_MODES[syshint][mode]
+        ctx = copilot_thread_context(item_id)
+        if ctx:
+            user += "\n\n─ Currently selected email ─\n" + ctx
+    else:
+        user = copilot_digest(72)
+        ctx = copilot_thread_context(item_id)
+        if ctx:
+            user += "\n\n─ Currently selected email (prioritize if relevant) ─\n" + ctx
+        user += "\n\nUser question: " + (ask or ("（沒有問題，給我信箱重點）" if zh else "(no question; give me the inbox highlights)"))
+
+    cfg = load_agent_cfg()
+    driver = cfg.get("driver") or "local"
+    text, used, error, fallback = "", driver, None, False
+    try:
+        if driver == "openai_compatible":
+            block = cfg.get("openai_compatible") or {}
+            base = (block.get("base_url") or "").rstrip("/")
+            model = block.get("model") or "gpt-4.1-mini"
+            key = os.environ.get(block.get("api_key_env") or "OPENAI_API_KEY") or ""
+            msgs = [{"role": "system", "content": COPILOT_SYSTEM[syshint]}]
+            for turn in (history or [])[-8:]:
+                role = "assistant" if turn.get("role") in ("assistant", "model") else "user"
+                if (turn.get("text") or "").strip():
+                    msgs.append({"role": role, "content": turn["text"][:2000]})
+            msgs.append({"role": "user", "content": user})
+            body = json.dumps({"model": model, "messages": msgs, "temperature": 0.4}).encode()
+            data = _post_json(
+                f"{base}/chat/completions",
+                {"Content-Type": "application/json", **({"Authorization": f"Bearer {key}"} if key else {})},
+                body, timeout=110, allow_private=bool(block.get("allow_private")))
+            text = (data["choices"][0]["message"]["content"] or "").strip()
+        elif driver in ("cli", "http"):
+            prompt = COPILOT_SYSTEM[syshint] + "\n\n" + user
+            pack = {"ask": prompt, "lang": lang, "mode": mode}
+            if driver == "cli":
+                text = _cli(pack, cfg)
+            else:
+                text = _http(pack, cfg)
+        else:
+            used, fallback = "local", True
+            text = _copilot_local(mode, ask, item_id, lang)
+    except Exception as e:
+        error, used, fallback = str(e)[:300], "local", True
+        text = _copilot_local(mode, ask, item_id, lang)
+    if not text:
+        used, fallback = "local", True
+        text = _copilot_local(mode, ask, item_id, lang)
+    try:
+        from yhbmail import db
+        con = db()
+        con.execute(
+            "INSERT INTO agent_turns(skill, ask, answer, driver, created_at) VALUES (?,?,?,?,?)",
+            (f"copilot:{mode}", ask or item_id or "", text[:4000], used, now_iso()),
+        )
+        con.commit()
+        con.close()
+    except Exception:
+        pass
+    return {"mode": mode, "text": text, "driver": used, "fallback": fallback, "error": error}

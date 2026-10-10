@@ -6,455 +6,829 @@
   <title>TooPowerInbox</title>
   <style>
     :root {
-      --bg: #12110f; --panel: #1b1916; --ink: #f4efe6; --muted: #9b9286;
-      --line: #2d2924; --accent: #c4a574; --need: #d27a5a; --look: #c4a574;
-      --fyi: #8a9aa8; --other: #6b6560; --up: #7ea07a;
+      --bg: #14120f; --panel: #1c1916; --ink: #f3eee6; --muted: #9a9186;
+      --line: #2c2722; --accent: #c4a574; --accent2: #dcc08c;
+      --need: #d27a5a; --look: #c4a574; --fyi: #8a9aa8; --other: #6b6560; --up: #7ea07a;
+      --ok: #7ea07a; --bad: #c0604f; --copilot-bg: #191612;
+      --shadow: 0 18px 48px rgba(0,0,0,.5);
     }
     * { box-sizing: border-box; }
     html, body { margin: 0; height: 100%; background: var(--bg); color: var(--ink);
-      font: 15px/1.45 "Iowan Old Style", "Source Han Serif TC", "Noto Serif TC", Georgia, serif; }
-    button, input, textarea { font: inherit; }
+      font: 15px/1.5 "Iowan Old Style", "Source Han Serif TC", "Songti TC", Georgia, serif; overflow: hidden; }
+    button, input, textarea, select { font: inherit; color: inherit; }
     button { cursor: pointer; }
-    #app { display: grid; grid-template-columns: 228px 1fr 400px; height: 100vh; }
-    aside { border-right: 1px solid var(--line); padding: 18px 14px; display: flex; flex-direction: column; gap: 14px; }
-    .brand { font-size: 20px; letter-spacing: .03em; }
-    .brand small { display: block; color: var(--muted); font-size: 12px; margin-top: 4px; line-height: 1.4; }
-    .lang { display: flex; border: 1px solid var(--line); border-radius: 8px; overflow: hidden; }
-    .lang button { flex: 1; background: transparent; color: var(--muted); border: 0; padding: 6px 0; }
-    .lang button.on { background: #26211c; color: var(--ink); }
-    .nav button { width: 100%; text-align: left; background: transparent; color: var(--ink);
-      border: 1px solid transparent; padding: 8px 10px; border-radius: 6px; }
-    .nav button.on { background: #26211c; border-color: var(--line); }
-    .label { color: var(--muted); font-size: 11px; letter-spacing: .08em; }
-    main { display: flex; flex-direction: column; min-width: 0; border-right: 1px solid var(--line); }
+    ::-webkit-scrollbar { width: 10px; height: 10px; }
+    ::-webkit-scrollbar-thumb { background: #332d26; border-radius: 6px; border: 2px solid var(--bg); }
+    ::-webkit-scrollbar-track { background: transparent; }
+
+    #app { display: grid; grid-template-columns: 234px minmax(340px, 1fr) minmax(400px, 46vw); grid-template-rows: 100vh; height: 100vh; }
+    aside, main, section { min-width: 0; min-height: 0; }
+    aside { border-right: 1px solid var(--line); padding: 18px 12px 12px; display: flex; flex-direction: column; gap: 14px; overflow-y: auto; }
+    .brand { font-size: 19px; letter-spacing: .04em; display: flex; align-items: baseline; gap: 8px; }
+    .brand .logo { display: inline-flex; width: 26px; height: 26px; border-radius: 7px; background: linear-gradient(135deg, var(--accent), #8f7343); color: #17130c; font-weight: 700; align-items: center; justify-content: center; font-size: 14px; }
+    .brand small { display: block; color: var(--muted); font-size: 11px; margin-top: 5px; }
+    .nav { display: flex; flex-direction: column; gap: 2px; }
+    .nav button { width: 100%; text-align: left; background: transparent; border: 1px solid transparent; padding: 8px 10px; border-radius: 8px; display: flex; justify-content: space-between; align-items: center; }
+    .nav button:hover { background: #221e19; }
+    .nav button.on { background: #2a241d; border-color: var(--line); }
+    .nav .cnt { color: var(--muted); font-size: 12px; }
+    .nav button.on .cnt { color: var(--accent); }
+    .acct button { width: 100%; text-align: left; background: transparent; border: 1px solid transparent; padding: 6px 10px; border-radius: 8px; color: var(--muted); font-size: 12.5px; line-height: 1.35; white-space: pre-line; }
+    .acct button:hover { background: #221e19; }
+    .acct button.on { background: #2a241d; color: var(--ink); border-color: var(--line); }
+    .label { color: var(--muted); font-size: 10.5px; letter-spacing: .12em; margin: 2px 6px 4px; text-transform: uppercase; }
+    .sidefoot { margin-top: auto; display: flex; flex-direction: column; gap: 8px; }
+    .chip { display: flex; align-items: center; gap: 7px; font-size: 12px; color: var(--muted); padding: 7px 9px; border: 1px solid var(--line); border-radius: 8px; background: var(--panel); }
+    .chip .led { width: 8px; height: 8px; border-radius: 50%; background: var(--bad); }
+    .chip.ready .led { background: var(--ok); }
+    .status { color: var(--muted); font-size: 11.5px; min-height: 1.2em; padding: 0 4px; }
+    .langbtn { width: 100%; background: transparent; border: 1px solid var(--line); color: var(--muted); padding: 6px; border-radius: 8px; font-size: 12px; }
+    .langbtn:hover { color: var(--ink); border-color: var(--accent); }
+
+    main { display: flex; flex-direction: column; border-right: 1px solid var(--line); }
     .toolbar { display: flex; gap: 8px; align-items: center; padding: 12px 14px; border-bottom: 1px solid var(--line); }
-    .toolbar input { flex: 1; background: var(--panel); color: var(--ink); border: 1px solid var(--line); padding: 8px 10px; border-radius: 6px; }
-    button.btn { background: var(--panel); color: var(--ink); border: 1px solid var(--line); padding: 7px 12px; border-radius: 6px; }
-    button.primary { background: var(--accent); color: #1a140c; border-color: var(--accent); }
-    .stats { display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; padding: 12px 14px; }
-    .stat { border: 1px solid var(--line); border-radius: 8px; padding: 10px 12px; }
-    .stat b { display: block; font-size: 22px; }
-    .stat span { color: var(--muted); font-size: 12px; }
-    .bars { padding: 0 14px 12px; }
-    .bar-row { display: grid; grid-template-columns: 7.5em 1fr 36px; gap: 8px; align-items: center; margin: 6px 0; }
-    .bar { height: 10px; background: #2a261f; border-radius: 99px; overflow: hidden; }
-    .bar i { display: block; height: 100%; }
-    .bar i.needs_you { background: var(--need); }
-    .bar i.upcoming { background: var(--up); }
-    .bar i.worth_a_look { background: var(--look); }
-    .bar i.fyi { background: var(--fyi); }
-    .bar i.other { background: var(--other); }
-    .list { overflow: auto; flex: 1; }
-    .row { display: grid; grid-template-columns: 14px 1fr auto; gap: 10px; padding: 10px 14px; border-bottom: 1px solid var(--line); cursor: pointer; }
-    .row:hover, .row.on { background: #201c18; }
-    .dot { width: 8px; height: 8px; border-radius: 50%; margin-top: 7px; background: var(--other); }
-    .dot.needs_you { background: var(--need); } .dot.worth_a_look { background: var(--look); }
-    .dot.fyi { background: var(--fyi); } .dot.upcoming { background: var(--up); }
-    .from { font-weight: 550; } .row.unread .from { font-weight: 700; }
-    .subj, .meta { color: var(--muted); font-size: 13px; }
-    .subj { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-    section { display: flex; flex-direction: column; background: #171410; min-width: 0; }
-    .pane { padding: 16px 18px; overflow: auto; flex: 1; }
-    h2 { font-size: 17px; margin: 0 0 8px; }
+    .toolbar input { flex: 1; background: var(--panel); border: 1px solid var(--line); padding: 8px 12px; border-radius: 9px; outline: none; }
+    .toolbar input:focus { border-color: #4a4136; }
+    .btn { background: var(--panel); border: 1px solid var(--line); padding: 7px 12px; border-radius: 9px; white-space: nowrap; }
+    .btn:hover { background: #262019; }
+    .btn.primary { background: var(--accent); color: #1a140c; border-color: var(--accent); font-weight: 600; }
+    .btn.primary:hover { background: var(--accent2); }
+    .btn.ghost { border-color: transparent; color: var(--muted); }
+    .btn.ghost:hover { color: var(--ink); background: #221e19; }
+    .tabs { display: flex; gap: 6px; padding: 10px 14px 12px; flex-wrap: wrap; border-bottom: 1px solid var(--line); }
+    .tabs button { background: transparent; color: var(--muted); border: 1px solid var(--line); border-radius: 999px; padding: 4px 11px; font-size: 12.5px; display: inline-flex; gap: 6px; align-items: center; }
+    .tabs button .n { font-size: 11px; color: var(--muted); }
+    .tabs button.on { color: var(--ink); border-color: var(--accent); background: rgba(196,165,116,.08); }
+    .tabs button.on .n { color: var(--accent); }
+    .list { overflow: auto; flex: 1; min-height: 0; }
+    .row { display: grid; grid-template-columns: 14px 1fr auto; gap: 10px; padding: 11px 14px; border-bottom: 1px solid #221e1a; cursor: pointer; }
+    .row > div { min-width: 0; }
+    .row:hover { background: #1e1a15; }
+    .row.on { background: #26211a; box-shadow: inset 3px 0 0 var(--accent); }
+    .row .dot { width: 8px; height: 8px; border-radius: 50%; margin-top: 7px; background: var(--other); flex: none; }
+    .dot.needs_you { background: var(--need); box-shadow: 0 0 5px rgba(210,122,90,.6); }
+    .dot.worth_a_look { background: var(--look); }
+    .dot.fyi { background: var(--fyi); }
+    .dot.upcoming { background: var(--up); }
+    .rowline { display: flex; align-items: center; gap: 6px; min-width: 0; }
+    .avatar { width: 22px; height: 22px; border-radius: 50%; flex: none; display: inline-flex; align-items: center; justify-content: center; font-size: 11px; color: #17130c; font-family: -apple-system, sans-serif; font-weight: 600; }
+    .from { color: var(--ink); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 13.5px; }
+    .row.unread .from { font-weight: 700; }
+    .subj { color: var(--muted); font-size: 12.5px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; margin-top: 2px; }
+    .meta { color: var(--muted); font-size: 11px; white-space: nowrap; text-align: right; line-height: 1.5; }
+    .empty { padding: 40px 20px; color: var(--muted); text-align: center; }
+
+    section { display: flex; flex-direction: column; background: #171410; position: relative; overflow: hidden; }
+    .pane { padding: 18px 22px; overflow: auto; flex: 1; min-height: 0; }
+    h2.mh { font-size: 17px; margin: 0 0 6px; line-height: 1.4; }
     .muted { color: var(--muted); }
-    .card { border: 1px solid var(--line); border-radius: 8px; padding: 10px 12px; margin: 0 0 10px; }
-    .agent { border-top: 1px solid var(--line); padding: 12px; display: flex; flex-direction: column; gap: 8px; }
-    .agent textarea { height: 70px; background: var(--panel); color: var(--ink); border: 1px solid var(--line); border-radius: 6px; padding: 8px; }
-    .skills { display: flex; flex-wrap: wrap; gap: 6px; }
-    .skills button { width: auto; }
-    .thread { white-space: pre-wrap; }
-    .status { color: var(--muted); font-size: 12px; }
+    .actionbar { display: flex; gap: 7px; flex-wrap: wrap; margin: 12px 0 16px; padding: 10px 0; border-top: 1px solid var(--line); border-bottom: 1px solid var(--line); }
+    .actionbar .btn { font-size: 12.5px; padding: 6px 11px; }
+    .msg { margin: 0 0 18px; }
+    .msg .msghead { display: flex; gap: 10px; align-items: center; margin-bottom: 6px; }
+    .msg .who { font-weight: 650; font-size: 13.5px; }
+    .msg .when { color: var(--muted); font-size: 12px; }
+    .msg .body { white-space: pre-wrap; word-break: break-word; overflow-wrap: anywhere; font-size: 14px; line-height: 1.7; color: #e8e1d4; }
+    .msg.collapsed .body { max-height: 120px; overflow: hidden; position: relative; }
+    .msg.collapsed .body::after { content: ""; position: absolute; left: 0; right: 0; bottom: 0; height: 60px; background: linear-gradient(transparent, #171410); }
+    .body.md { white-space: normal; }
+    .body.md .mdh { font-weight: 700; color: var(--accent2); margin: 10px 0 4px; }
+    .body.md ul { margin: 4px 0; padding-left: 18px; }
+    .expand { background: transparent; border: none; color: var(--accent); font-size: 12px; padding: 4px 0; }
+    .board .card { border: 1px solid var(--line); border-radius: 10px; padding: 10px 12px; margin-bottom: 10px; background: var(--panel); }
+    .card .muted { font-size: 12.5px; margin-top: 4px; }
+
+    #copilot { position: absolute; inset: 0; left: 24%; background: var(--copilot-bg); border-left: 1px solid #3a332a; display: flex; flex-direction: column; transform: translateX(102%); transition: transform .28s cubic-bezier(.2,.8,.2,1); z-index: 30; box-shadow: var(--shadow); }
+    #copilot.open { transform: translateX(0); }
+    .cp-head { display: flex; align-items: center; gap: 9px; padding: 13px 16px; border-bottom: 1px solid var(--line); }
+    .cp-head .spark { font-size: 16px; }
+    .cp-head .t { font-weight: 650; }
+    .cp-head .sub { color: var(--muted); font-size: 11px; }
+    .cp-head .x { margin-left: auto; background: transparent; border: none; color: var(--muted); font-size: 17px; padding: 2px 7px; border-radius: 6px; }
+    .cp-head .x:hover { color: var(--ink); background: #2a241d; }
+    .cp-context { display: flex; align-items: center; gap: 8px; margin: 10px 14px 0; padding: 7px 10px; border: 1px dashed #4a4136; border-radius: 8px; font-size: 12px; color: var(--accent2); background: rgba(196,165,116,.05); }
+    .cp-context .cx { margin-left: auto; background: none; border: none; color: var(--muted); padding: 0 3px; }
+    .cp-msgs { flex: 1; overflow-y: auto; padding: 14px 16px; display: flex; flex-direction: column; gap: 12px; min-height: 0; }
+    .bubble { max-width: 92%; padding: 10px 13px; border-radius: 12px; font-size: 13.5px; line-height: 1.6; word-break: break-word; }
+    .bubble.user { align-self: flex-end; background: #2f2a1e; border: 1px solid #453b28; border-bottom-right-radius: 4px; }
+    .bubble.ai { align-self: flex-start; background: #211d17; border: 1px solid var(--line); border-bottom-left-radius: 4px; }
+    .bubble.ai.fallback { border-color: #6b4a3a; }
+    .bubble .fbnote { color: var(--need); font-size: 11px; margin-bottom: 6px; }
+    .bubble h3.bh { font-size: 13.5px; margin: 8px 0 4px; color: var(--accent2); border-bottom: 1px dashed #3a332a; padding-bottom: 3px; }
+    .bubble ul { margin: 4px 0; padding-left: 18px; }
+    .bubble .draftacts { display: flex; gap: 6px; margin: 6px 0 10px; }
+    .bubble .draftacts .btn { font-size: 11.5px; padding: 4px 9px; }
+    .typing { align-self: flex-start; color: var(--muted); font-size: 12.5px; padding: 8px 4px; display: flex; gap: 4px; align-items: center; }
+    .typing .d { width: 5px; height: 5px; border-radius: 50%; background: var(--muted); animation: blink 1.2s infinite; }
+    .typing .d:nth-child(2) { animation-delay: .2s; } .typing .d:nth-child(3) { animation-delay: .4s; }
+    @keyframes blink { 0%,80%,100% { opacity: .25; } 40% { opacity: 1; } }
+    .cp-chips { display: flex; gap: 6px; flex-wrap: wrap; padding: 8px 14px 2px; }
+    .cp-chips button { background: transparent; border: 1px solid var(--line); color: var(--muted); border-radius: 999px; font-size: 11.5px; padding: 4px 10px; }
+    .cp-chips button:hover { color: var(--ink); border-color: var(--accent); }
+    .cp-input { display: flex; gap: 8px; padding: 12px 14px 14px; }
+    .cp-input textarea { flex: 1; height: 54px; resize: none; background: var(--panel); border: 1px solid var(--line); border-radius: 10px; padding: 9px 11px; outline: none; }
+    .cp-input .send { background: var(--accent); color: #1a140c; border: none; border-radius: 10px; padding: 0 16px; font-weight: 650; }
+    .cp-input .send:disabled { opacity: .45; }
+
+    #modalback { position: fixed; inset: 0; background: rgba(10,8,6,.62); display: none; align-items: center; justify-content: center; z-index: 60; }
+    #modalback.open { display: flex; }
+    .modal { width: min(640px, 92vw); max-height: 86vh; overflow-y: auto; background: var(--panel); border: 1px solid #3a332a; border-radius: 14px; box-shadow: var(--shadow); padding: 18px 20px; }
+    .modal h3 { margin: 0 0 12px; font-size: 16px; }
+    .modal .frow { display: flex; gap: 8px; margin-bottom: 10px; }
+    .modal .frow input { flex: 1; background: #171410; border: 1px solid var(--line); border-radius: 8px; padding: 8px 10px; outline: none; }
+    .modal textarea { width: 100%; min-height: 260px; background: #171410; border: 1px solid var(--line); border-radius: 8px; padding: 10px; outline: none; resize: vertical; line-height: 1.7; }
+    .modal .acts { display: flex; gap: 8px; justify-content: flex-end; margin-top: 12px; }
+    .modal .note { color: var(--muted); font-size: 11.5px; margin-top: 8px; }
+    #toasts { position: fixed; right: 18px; bottom: 18px; display: flex; flex-direction: column; gap: 8px; z-index: 80; }
+    .toast { background: #242019; border: 1px solid #3a332a; border-left: 3px solid var(--accent); border-radius: 9px; padding: 10px 14px; font-size: 13px; box-shadow: var(--shadow); animation: rise .25s ease; max-width: 340px; }
+    .toast.err { border-left-color: var(--bad); }
+    @keyframes rise { from { transform: translateY(8px); opacity: 0; } to { transform: none; opacity: 1; } }
+    kbd { background: #26211b; border: 1px solid var(--line); border-radius: 4px; padding: 0 5px; font-size: 11px; font-family: -apple-system, sans-serif; }
+    .hint { color: var(--muted); font-size: 12px; margin-top: 10px; }
+    .brainform { display: flex; flex-direction: column; gap: 8px; margin: 12px 0 18px; }
+    .brainform input, .brainform textarea { background: #171410; border: 1px solid var(--line); border-radius: 8px; padding: 8px 10px; outline: none; }
+    .brainform textarea { min-height: 70px; resize: vertical; }
   </style>
 </head>
 <body>
   <div id="app">
     <aside>
-      <div class="brand">TooPowerInbox<small id="tagline"></small></div>
-      <div class="lang">
-        <button type="button" data-lang="zh-Hant" id="langZh">繁中</button>
-        <button type="button" data-lang="en" id="langEn">EN</button>
+      <div class="brand"><span class="logo">TP</span><span>TooPowerInbox<small id="brandSub">本機大腦 · BYO Agent</small></span></div>
+      <div class="nav" id="nav">
+        <button class="on" data-view="mail" data-k="navMail">郵件 <span class="cnt" id="cnt-mail"></span></button>
+        <button data-view="brain" data-k="navBrain">大腦看板 <span class="cnt" id="cnt-brain"></span></button>
+        <button data-view="brain2" data-k="navBrain2">第二大腦 <span class="cnt" id="cnt-brain2"></span></button>
+        <button data-view="calendar" data-k="navCal">日曆 <span class="cnt" id="cnt-cal"></span></button>
+        <button data-view="drafts" data-k="navDrafts">草稿匣 <span class="cnt" id="cnt-drafts"></span></button>
       </div>
-      <div class="nav">
-        <button class="on" data-view="dash" data-i18n="navDash"></button>
-        <button data-view="mail" data-i18n="navMail"></button>
-        <button data-view="brain" data-i18n="navBrain"></button>
-        <button data-view="persona" data-i18n="navPersona"></button>
-        <button data-view="agent" data-i18n="navAgent"></button>
+      <div>
+        <div class="label" data-k="lblAccounts">信箱</div>
+        <div class="acct" id="accounts"></div>
       </div>
-      <div class="status" id="status"></div>
+      <div class="sidefoot">
+        <div class="chip" id="agentChip"><span class="led"></span><span id="agentText">Agent…</span></div>
+        <button class="langbtn" id="langBtn">English</button>
+        <div class="status" id="syncStatus"></div>
+      </div>
     </aside>
+
     <main>
       <div class="toolbar">
-        <input id="q" />
-        <button class="btn" id="searchBtn"></button>
-        <button class="btn primary" id="syncBtn"></button>
+        <input id="q" placeholder="搜尋本機快取" />
+        <button class="btn primary" id="syncBtn" data-k="btnSync">同步</button>
+        <button class="btn" id="cpBtn">✦ Copilot</button>
       </div>
-      <div class="stats" id="stats"></div>
-      <div class="bars" id="bars"></div>
+      <div class="tabs" id="tabs"></div>
       <div class="list" id="list"></div>
     </main>
+
     <section>
       <div class="pane" id="pane"></div>
-      <div class="agent">
-        <div class="label" id="skillLabel"></div>
-        <div class="skills" id="skills"></div>
-        <textarea id="ask"></textarea>
-        <div>
-          <button class="btn primary" id="askBtn"></button>
-          <button class="btn" id="draftBtn"></button>
+      <div id="copilot">
+        <div class="cp-head">
+          <span class="spark">✦</span>
+          <div><div class="t">Copilot</div><div class="sub" id="cpSub"></div></div>
+          <button class="x" id="cpClose">✕</button>
+        </div>
+        <div class="cp-context" id="cpContext" style="display:none">
+          <span>📎</span><span id="cpCtxText" style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap"></span>
+          <button class="cx" id="cpCtxClear">✕</button>
+        </div>
+        <div class="cp-msgs" id="cpMsgs"></div>
+        <div class="cp-chips" id="cpChips"></div>
+        <div class="cp-input">
+          <textarea id="cpAsk" placeholder=""></textarea>
+          <button class="send" id="cpSend" data-k="btnSend">送出</button>
         </div>
       </div>
     </section>
   </div>
+
+  <div id="modalback">
+    <div class="modal">
+      <h3 id="mTitle" data-k="mTitle">回信草稿</h3>
+      <div class="frow"><input id="mTo" placeholder="To" /></div>
+      <div class="frow"><input id="mSubject" placeholder="Subject" /></div>
+      <textarea id="mBody"></textarea>
+      <div class="acts">
+        <button class="btn ghost" id="mCancel" data-k="btnCancel">取消</button>
+        <button class="btn" id="mCopy" data-k="btnCopy">複製全文</button>
+        <button class="btn primary" id="mSave" data-k="btnSave">存入本機草稿匣</button>
+      </div>
+      <div class="note" data-k="mNote">草稿只存在本機資料庫。TooPowerInbox 設計上不寄信。</div>
+    </div>
+  </div>
+  <div id="toasts"></div>
+
   <script>
-    const I18N = {
-      "zh-Hant": {
-        tagline: "本機信箱腦。你自己帶 Agent 進來。",
-        navDash: "總覽",
-        navMail: "收件匣",
-        navBrain: "第二大腦",
-        navPersona: "更了解你",
-        navAgent: "Agent",
-        search: "搜尋",
-        refresh: "重新整理",
-        searchPh: "搜尋信件、寄件人、第二大腦",
-        askPh: "問你的 Agent。晨間簡報、誰在催、起草回信。",
-        skillLabel: "技能 · 自帶 Agent",
-        runAgent: "執行 Agent",
-        saveDraft: "把右側存成草稿",
-        loading: "載入中",
-        refreshing: "重新整理中",
-        agentSuffix: " Agent",
-        mail: "信件",
-        unread: "未讀",
-        brainCards: "大腦卡片",
-        calendar: "行事曆",
-        needs_you: "需要你",
-        upcoming: "即將到來",
-        worth_a_look: "值得一看",
-        fyi: "僅供參考",
-        other: "可清理",
-        dashTitle: "總覽",
-        dashLead: "五桶分信，加上第二大腦。第一次開啟會載入示範信件。之後再用 gog 或 gsk 接真信箱。",
-        attention: "此刻要注意",
-        howWrite: "你怎麼寫信",
-        emptyNeed: "「需要你」是空的。重新整理，或接上真信箱。",
-        none: "無",
-        inboxTitle: "收件匣",
-        inboxLead: "點一封信看內文。預設不寄信。草稿只留在這台機器。",
-        brainTitle: "第二大腦",
-        brainLead: "張卡片在 vault/cards。從信件與行事曆蒸餾出來。",
-        personaTitle: "更了解你",
-        inboxHabits: "收信習慣",
-        writing: "文風",
-        facts: "已學到的事實",
-        source: "來源",
-        threads: "封往來",
-        agentTitle: "自己帶 Agent 進來",
-        agentLead: "預設驅動是 local。把 agent.json 指到 OpenAI 相容端點、CLI 或 HTTP worker。工具在 /api/v1/tools。",
-        contextHelp: "人格、看板、近期信件，給你自己的迴圈用。",
-        running: "Agent 執行中",
-        draftSaved: "草稿已存本機",
-        notFound: "找不到",
-        "morning-brief": "晨間簡報",
-        "catch-me-up": "快速補課",
-        "categorize-inbox": "信箱分類",
-        "plan-my-week": "本週安排",
-        "know-you-better": "更了解你",
-        list_inbox: "列出近期信件。參數：q、category、limit",
-        brain_board: "五桶分信看板。參數：hours",
-        search_brain: "搜尋第二大腦卡片。參數：q",
-        persona: "讀取「更了解你」檔案。無需參數",
-        save_draft: "存本機草稿。絕不寄出。參數：to、subject、body",
-        "Calendar or meeting": "行事曆或會議",
-        "Direct ask or deadline": "直接請你回或期限",
-        "Money or renewal": "金流或續約",
-        Promotion: "促銷",
-        "Automated notice": "自動通知",
-        "Unread, not obviously junk": "未讀，不像垃圾信",
-        "No hard action": "沒有硬性動作",
-        Calendar: "行事曆",
-        mailKind: "信件",
-        calendarKind: "行事曆",
-        noteKind: "筆記",
+    "use strict";
+    const state = {
+      view: "mail", account: "", category: "all", q: "",
+      emails: [], selected: null, selIdx: -1, brain: null, drafts: [], calEvents: [], brainCards: [],
+      cpOpen: false, cpBusy: false, cpHistory: [], cpUseSelection: true,
+      lang: localStorage.getItem("tpi-lang") || "zh",
+      cfg: null,
+    };
+    const $ = (id) => document.getElementById(id);
+    const api = async (path, opt) => (await fetch(path, opt)).json();
+    const esc = (s) => String(s ?? "").replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
+    const fmtDT = (s) => String(s ?? "").replace(/(\d)T(\d)/g, "$1 $2");
+    const zh = () => state.lang === "zh";
+
+    const S = {
+      zh: {
+        brandSub: "本機大腦 · BYO Agent", navMail: "郵件", navBrain: "大腦看板", navBrain2: "第二大腦",
+        navCal: "日曆", navDrafts: "草稿匣", lblAccounts: "信箱", allAccounts: "所有收件匣",
+        btnSync: "同步", btnSend: "送出", btnCancel: "取消", btnCopy: "複製全文", btnSave: "存入本機草稿匣",
+        mTitle: "回信草稿", mNote: "草稿只存在本機資料庫。TooPowerInbox 設計上不寄信。",
+        search: "搜尋本機快取：寄件人、主旨、摘要（按 / 聚焦）",
+        cats: { all: "全部", needs_you: "需要你", upcoming: "今天之後", worth_a_look: "值得看", fyi: "僅供參考", other: "可清掉" },
+        cpAsk: "問我任何關於信箱的事…（Enter 送出／Shift+Enter 換行）",
+        cpWelcome: "我是信箱 Copilot。可以問我信箱的事，或點下面的快捷鍵。正在看的信會自動變成我的參考資料。",
+        cpSummarize: "✦ 30 秒摘要", cpTodos: "⚑ 待辦與期限", cpDraft: "✎ 回信草稿×3",
+        cpCopyBody: "複製內文", cpMarkUnread: "標成未讀",
+        chips: [
+          { t: "晨間速覽", ask: "把上次工作日之後進信箱的信，依「需要你／值得看／僅供參考」整理成晨間速覽；「需要你」的要寫到我能直接決定。" },
+          { t: "這陣子發生什麼", ask: "用寄件人與主題把最近的信箱活動收成幾組；先講要回的，再講可以掃過的。" },
+          { t: "收件匣分類", ask: "把最近的信分成需要你、值得看、僅供參考、可清掉，並點名最大的噪音來源。" },
+          { t: "本週怎麼排", ask: "把行事曆與信箱待辦合成一張本週圖：會議、截止、還有卡住的回信。" },
+        ],
+        emptyList: "這個分類沒有信。按「同步」抓信件；demo 模式已有種子信。", noEvents: "尚無事件，按「同步」抓日曆。",
+        emptyDrafts: "草稿匣是空的。開一封信按「回信草稿×3」，Copilot 會幫你起草。", noCards: "還沒有第二大腦卡片。",
+        draftsTitle: "本機草稿匣", draftsHint: "草稿只存在這台機器；設計上不自動寄信。",
+        welcomeTitle: "TooPowerInbox · 本機 GenMail 式郵件大腦",
+        welcomeHint: "按 c 打開 Copilot 抽屜，直接用自然語言問信箱的事。",
+        edit: "編輯", del: "刪除", copied: "已複製到剪貼簿", copyFail: "複製失敗，請手動選取",
+        saved: "已存入本機草稿匣", saveFail: "儲存失敗", deleted: "草稿已刪除", callFail: "呼叫失敗：",
+        fbNote: "⚠ 未接 LLM（本機啟發式結果）— 在 agent.json 設定 driver 可升級",
+        synced: "同步完成", syncing: "同步中…", lastSync: "上次同步", thinking: "思考中",
+        showFull: "顯示全文", chars: "字", editDraft: "✎ 編輯草稿", saveDraftNow: "直接存草稿匣",
+        draftASaved: "草稿已存入草稿匣", brainTitle: "第二大腦與更了解你", cardTitle: "標題", cardBody: "內容",
+        addCard: "新增卡片", persona: "更了解你", rebuildHint: "同步後自動重建；也可手動 POST /api/rebuild。",
+        agentLocal: "Copilot：本機啟發式（agent.json 可接 LLM）",
       },
       en: {
-        tagline: "Local mail brain. Bring your own agent.",
-        navDash: "Dashboard",
-        navMail: "Inbox",
-        navBrain: "Second Brain",
-        navPersona: "Know you better",
-        navAgent: "Agent",
-        search: "Search",
-        refresh: "Refresh",
-        searchPh: "Search mail, senders, second brain",
-        askPh: "Ask your agent. Morning brief, who is loud, draft a reply.",
-        skillLabel: "Skills · BYO agent",
-        runAgent: "Run agent",
-        saveDraft: "Save pane as draft",
-        loading: "loading",
-        refreshing: "refreshing",
-        agentSuffix: " agent",
-        mail: "Mail",
-        unread: "Unread",
-        brainCards: "Brain cards",
-        calendar: "Calendar",
-        needs_you: "Needs you",
-        upcoming: "Upcoming",
-        worth_a_look: "Worth a look",
-        fyi: "FYI",
-        other: "Cleanup",
-        dashTitle: "Dashboard",
-        dashLead: "Five-bucket triage plus Second Brain. Demo data loads on first run. Connect gog or gsk later.",
-        attention: "Attention now",
-        howWrite: "How you write",
-        emptyNeed: "Nothing in Needs you. Refresh or connect mail.",
-        none: "None",
-        inboxTitle: "Inbox",
-        inboxLead: "Click a thread. Send is off. Drafts stay on this machine.",
-        brainTitle: "Second Brain",
-        brainLead: "cards in vault/cards. Distilled from mail and calendar.",
-        personaTitle: "Know you better",
-        inboxHabits: "Inbox habits",
-        writing: "Writing",
-        facts: "Facts learned",
-        source: "source",
-        threads: "threads",
-        agentTitle: "Bring your own agent",
-        agentLead: "Default driver is local. Point agent.json at an OpenAI-compatible endpoint, a CLI, or an HTTP worker. Tools live at /api/v1/tools.",
-        contextHelp: "Persona, board, and recent mail for your own loop.",
-        running: "Agent running",
-        draftSaved: "Draft saved locally",
-        notFound: "not found",
-        "morning-brief": "Morning brief",
-        "catch-me-up": "Catch me up",
-        "categorize-inbox": "Categorize inbox",
-        "plan-my-week": "Plan my week",
-        "know-you-better": "Know you better",
-        list_inbox: "List recent mail. Args: q, category, limit",
-        brain_board: "Five-bucket triage board. Args: hours",
-        search_brain: "Search Second Brain cards. Args: q",
-        persona: "Read the know-you-better profile. Args: none",
-        save_draft: "Store a local draft. Never sends. Args: to, subject, body",
-        "Calendar or meeting": "Calendar or meeting",
-        "Direct ask or deadline": "Direct ask or deadline",
-        "Money or renewal": "Money or renewal",
-        Promotion: "Promotion",
-        "Automated notice": "Automated notice",
-        "Unread, not obviously junk": "Unread, not obviously junk",
-        "No hard action": "No hard action",
-        Calendar: "Calendar",
-        mailKind: "mail",
-        calendarKind: "calendar",
-        noteKind: "note",
+        brandSub: "Local brain · BYO Agent", navMail: "Mail", navBrain: "Triage board", navBrain2: "Second brain",
+        navCal: "Calendar", navDrafts: "Drafts", lblAccounts: "Accounts", allAccounts: "All inboxes",
+        btnSync: "Sync", btnSend: "Send", btnCancel: "Cancel", btnCopy: "Copy all", btnSave: "Save to local drafts",
+        mTitle: "Reply draft", mNote: "Drafts live in your local database. TooPowerInbox never sends mail by design.",
+        search: "Search local cache: from, subject, snippet (/ to focus)",
+        cats: { all: "All", needs_you: "Needs you", upcoming: "Upcoming", worth_a_look: "Worth a look", fyi: "FYI", other: "Cleanup" },
+        cpAsk: "Ask me anything about your inbox… (Enter to send / Shift+Enter for newline)",
+        cpWelcome: "I'm your inbox Copilot. Ask about your mail, or use the shortcuts. The email you're reading becomes my context automatically.",
+        cpSummarize: "✦ 30s summary", cpTodos: "⚑ Actions & deadlines", cpDraft: "✎ Draft replies ×3",
+        cpCopyBody: "Copy body", cpMarkUnread: "Mark unread",
+        chips: [
+          { t: "Morning brief", ask: "Triage everything since my last working day into Needs you / Worth a look / FYI; make Needs you decision-ready." },
+          { t: "Catch me up", ask: "Group recent inbox activity by sender and subject; replies needed first, then skimmable." },
+          { t: "Categorize inbox", ask: "Split recent mail into Needs you / Worth a look / FYI / Cleanup and name the loudest noise source." },
+          { t: "Plan my week", ask: "Merge calendar and inbox todos into one week view: meetings, deadlines, stuck replies." },
+        ],
+        emptyList: "Nothing in this bucket. Hit Sync (demo mode seeds sample mail).", noEvents: "No events yet — hit Sync.",
+        emptyDrafts: "Drafts are empty. Open an email and hit 'Draft replies ×3'.", noCards: "No second-brain cards yet.",
+        draftsTitle: "Local drafts", draftsHint: "Drafts stay on this machine; nothing is ever auto-sent.",
+        welcomeTitle: "TooPowerInbox · a local GenMail-style inbox brain",
+        welcomeHint: "Press c to open the Copilot drawer and just ask in plain language.",
+        edit: "Edit", del: "Delete", copied: "Copied to clipboard", copyFail: "Copy failed — select manually",
+        saved: "Saved to local drafts", saveFail: "Save failed", deleted: "Draft deleted", callFail: "Call failed: ",
+        fbNote: "⚠ No LLM wired (local heuristic). Set a driver in agent.json to upgrade.",
+        synced: "Sync done", syncing: "Syncing…", lastSync: "Last sync", thinking: "thinking",
+        showFull: "Show full text", chars: "chars", editDraft: "✎ Edit draft", saveDraftNow: "Save to drafts",
+        draftASaved: "Draft saved", brainTitle: "Second brain & know-you-better", cardTitle: "Title", cardBody: "Body",
+        addCard: "Add card", persona: "Know you better", rebuildHint: "Rebuilt after sync; manual: POST /api/rebuild.",
+        agentLocal: "Copilot: local heuristic (wire an LLM in agent.json)",
       },
     };
+    const T = (k) => (S[zh() ? "zh" : "en"][k] ?? k);
+    const catName = (id) => zh() ? (S.zh.cats[id] || id) : ((state.brain?.taxonomy || []).find((t) => t.id === id)?.name || S.en.cats[id] || id);
+    const TABS = ["all", "needs_you", "worth_a_look", "fyi", "other"];
 
-    const CATS = ["needs_you", "upcoming", "worth_a_look", "fyi", "other"];
-    const state = { view: "dash", overview: null, lang: pickLang() };
-    const $ = (id) => document.getElementById(id);
-    const t = (k) => (I18N[state.lang] && I18N[state.lang][k]) || I18N.en[k] || k;
-    const api = (p, o) => fetch(p, o).then((r) => r.json());
-    const esc = (s) => String(s ?? "").replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
-
-    function pickLang() {
-      const q = new URLSearchParams(location.search).get("lang");
-      if (q === "en" || q === "zh-Hant") return q;
-      try {
-        const saved = localStorage.getItem("tpi-lang");
-        if (saved === "en" || saved === "zh-Hant") return saved;
-      } catch (_) {}
-      const nav = (navigator.language || "").toLowerCase();
-      return nav.startsWith("zh") ? "zh-Hant" : "en";
+    function applyLang() {
+      document.documentElement.lang = zh() ? "zh-Hant" : "en";
+      document.querySelectorAll("[data-k]").forEach((el) => { el.textContent = T(el.dataset.k); });
+      $("q").placeholder = T("search");
+      $("cpAsk").placeholder = T("cpAsk");
+      $("langBtn").textContent = zh() ? "English" : "繁體中文";
+      $("brandSub").textContent = T("brandSub");
+      renderTabs(); renderChips(); renderWelcome(); refreshCounts();
     }
 
-    function setLang(lang) {
-      state.lang = lang === "en" ? "en" : "zh-Hant";
-      try { localStorage.setItem("tpi-lang", state.lang); } catch (_) {}
-      const url = new URL(location.href);
-      url.searchParams.set("lang", state.lang);
-      history.replaceState(null, "", url);
-      paintChrome();
-      if (state.overview) renderView();
+    function toast(msg, isErr) {
+      const d = document.createElement("div");
+      d.className = "toast" + (isErr ? " err" : "");
+      d.textContent = msg;
+      $("toasts").appendChild(d);
+      setTimeout(() => { d.style.opacity = "0"; d.style.transition = "opacity .4s"; setTimeout(() => d.remove(), 420); }, 3200);
+    }
+    async function copyText(txt, note) {
+      try { await navigator.clipboard.writeText(txt); toast(note || T("copied")); }
+      catch { toast(T("copyFail"), true); }
     }
 
-    function paintChrome() {
-      document.documentElement.lang = state.lang;
-      document.title = "TooPowerInbox";
-      $("tagline").textContent = t("tagline");
-      $("langZh").classList.toggle("on", state.lang === "zh-Hant");
-      $("langEn").classList.toggle("on", state.lang === "en");
-      document.querySelectorAll("[data-i18n]").forEach((el) => { el.textContent = t(el.dataset.i18n); });
-      $("q").placeholder = t("searchPh");
-      $("searchBtn").textContent = t("search");
-      $("syncBtn").textContent = t("refresh");
-      $("skillLabel").textContent = t("skillLabel");
-      $("ask").placeholder = t("askPh");
-      $("askBtn").textContent = t("runAgent");
-      $("draftBtn").textContent = t("saveDraft");
-      if (state.overview) paintOverviewBits();
-      else $("status").textContent = t("loading");
+    const AVATAR_COLORS = ["#c4a574", "#8a9aa8", "#7ea07a", "#d27a5a", "#a78bba", "#6f9fb8", "#b8876b", "#96a37a"];
+    function avatarHtml(addr) {
+      const m = String(addr || "").match(/[A-Za-z0-9]/);
+      const ch = m ? m[0].toUpperCase() : "＠";
+      let h = 0; for (const c of String(addr || "?")) h = (h * 31 + c.charCodeAt(0)) >>> 0;
+      return `<span class="avatar" style="background:${AVATAR_COLORS[h % AVATAR_COLORS.length]}">${esc(ch)}</span>`;
     }
-
-    function catName(k) { return t(k); }
-    function reason(s) { return s ? t(s) : ""; }
-    function kindName(k) {
-      if (k === "calendar") return t("calendarKind");
-      if (k === "note") return t("noteKind");
-      if (k === "mail") return t("mailKind");
-      return k || "";
-    }
-
-    function paintOverviewBits() {
-      const ov = state.overview;
-      $("status").textContent = (ov.agent && ov.agent.driver ? ov.agent.driver : "local") + t("agentSuffix");
-      $("stats").innerHTML = [
-        [t("mail"), ov.counts.emails],
-        [t("unread"), ov.counts.unread],
-        [t("brainCards"), ov.brain.count],
-        [t("calendar"), ov.counts.events],
-      ].map(([k, v]) => `<div class="stat"><b>${v}</b><span>${k}</span></div>`).join("");
-      const counts = ov.board.counts || {};
-      const max = Math.max(1, ...Object.values(counts));
-      $("bars").innerHTML = CATS.map((k) => {
-        const n = counts[k] || 0;
-        return `<div class="bar-row"><div>${catName(k)}</div><div class="bar"><i class="${k}" style="width:${Math.round(n / max * 100)}%"></i></div><div>${n}</div></div>`;
-      }).join("");
-      $("skills").innerHTML = (ov.skills || []).map((s) =>
-        `<button class="btn" data-skill="${s.slug}">${esc(t(s.slug))}</button>`).join("");
+    function fromLabel(addr) {
+      const s = String(addr || "");
+      const nm = s.match(/^"?([^"<]+)"?\s*</);
+      return nm ? nm[1].trim() : (s.split("<")[0].trim() || s || "—");
     }
 
     async function boot() {
-      paintChrome();
-      const ov = await api("/api/overview");
-      state.overview = ov;
-      paintOverviewBits();
-      renderView();
-    }
-
-    function renderView() {
-      if (state.view === "dash") return renderDash();
-      if (state.view === "mail") return loadMail();
-      if (state.view === "brain") return renderBrain();
-      if (state.view === "persona") return renderPersona();
-      if (state.view === "agent") return renderAgentHelp();
-    }
-
-    function renderDash() {
-      const ov = state.overview;
-      const need = (ov.board.todos.needs_you || []).slice(0, 8);
-      $("list").innerHTML = need.map(itemRow).join("") || `<div class="pane muted">${t("emptyNeed")}</div>`;
-      const att = (ov.persona.attention_now || []).map(esc).join("<br>") || t("none");
-      $("pane").innerHTML = `<h2>${t("dashTitle")}</h2>
-        <p class="muted">${t("dashLead")}</p>
-        <div class="card"><strong>${t("attention")}</strong><div class="muted">${att}</div></div>
-        <div class="card"><strong>${t("howWrite")}</strong><div class="muted">${(ov.persona.how_you_write || []).map(esc).join("<br>")}</div></div>`;
-      bindListClicks();
-    }
-
-    function itemRow(item) {
-      return `<div class="row" data-id="${esc(item.id)}" data-kind="${item.kind || "mail"}">
-        <div class="dot ${item.category}"></div>
-        <div><div class="from">${esc(item.from_addr || kindName(item.kind))}</div><div class="subj">${esc(item.text || item.title)}</div></div>
-        <div class="meta">${esc(reason(item.flag_reason))}</div>
-      </div>`;
-    }
-
-    async function loadMail() {
-      const q = $("q").value.trim();
-      const data = await api("/api/inbox?limit=80" + (q ? "&q=" + encodeURIComponent(q) : ""));
-      $("list").innerHTML = (data.emails || []).map((e) => `
-        <div class="row ${e.unread ? "unread" : ""}" data-id="${esc(e.id)}">
-          <div class="dot ${e.category}"></div>
-          <div><div class="from">${esc(e.from_addr)}</div><div class="subj">${esc(e.subject)}</div></div>
-          <div class="meta">${esc((e.date_raw || "").slice(0, 16))}</div>
-        </div>`).join("");
-      $("pane").innerHTML = `<h2>${t("inboxTitle")}</h2><p class="muted">${t("inboxLead")}</p>`;
-      bindListClicks();
-    }
-
-    function renderBrain() {
-      const cards = (state.overview.brain.cards || []);
-      $("list").innerHTML = cards.map((c) => `
-        <div class="row" data-card="${esc(c.id)}">
-          <div class="dot ${c.category || "fyi"}"></div>
-          <div><div class="from">${esc(kindName(c.kind))}</div><div class="subj">${esc(c.title)}</div></div>
-          <div class="meta">${esc(catName(c.category || "fyi"))}</div>
-        </div>`).join("");
-      $("pane").innerHTML = `<h2>${t("brainTitle")}</h2><p class="muted">${cards.length} ${t("brainLead")}</p>
-        ${cards.slice(0, 6).map((c) => `<div class="card"><strong>${esc(c.title)}</strong><div class="muted">${esc(c.body || "")}</div></div>`).join("")}`;
-    }
-
-    function renderPersona() {
-      const p = state.overview.persona;
-      $("list").innerHTML = (p.top_senders || []).map((s) => `
-        <div class="row"><div class="dot fyi"></div><div><div class="from">${esc(s.email)}</div><div class="subj">${s.count} ${t("threads")}</div></div></div>`).join("");
-      $("pane").innerHTML = `<h2>${t("personaTitle")}</h2>
-        <p>${esc(p.identity && p.identity.name)} · ${esc(p.identity && p.identity.role)}</p>
-        <div class="card"><strong>${t("inboxHabits")}</strong><div class="muted">${(p.how_you_run_inbox || []).map(esc).join("<br>")}</div></div>
-        <div class="card"><strong>${t("writing")}</strong><div class="muted">${(p.how_you_write || []).map(esc).join("<br>")}</div></div>
-        <div class="card"><strong>${t("facts")}</strong> ${p.facts_learned || 0} · ${t("source")} ${esc(p.source)}</div>`;
-    }
-
-    function renderAgentHelp() {
-      $("list").innerHTML = (state.overview.tools || []).map((tool) => `
-        <div class="row"><div class="dot worth_a_look"></div><div><div class="from">${esc(tool.name)}</div><div class="subj">${esc(t(tool.name))}</div></div></div>`).join("");
-      $("pane").innerHTML = `<h2>${t("agentTitle")}</h2>
-        <p class="muted">${t("agentLead")}</p>
-        <div class="card"><strong>POST /api/v1/agent/run</strong><div class="muted">{ "ask": "...", "skill": "morning-brief", "driver": "local", "lang": "${state.lang}" }</div></div>
-        <div class="card"><strong>GET /api/v1/context</strong><div class="muted">${t("contextHelp")}</div></div>`;
-    }
-
-    function bindListClicks() {
-      $("list").onclick = async (ev) => {
-        const row = ev.target.closest(".row");
-        if (!row || !row.dataset.id) return;
-        if (String(row.dataset.id).startsWith("cal:")) return;
-        const item = await api("/api/thread/" + encodeURIComponent(row.dataset.id));
-        if (item.error) { $("pane").innerHTML = `<p class="muted">${esc(t("notFound"))}</p>`; return; }
-        $("pane").innerHTML = `<h2>${esc(item.subject)}</h2>
-          <p class="muted">${esc(item.from_addr)} · ${esc(catName(item.category))} · ${esc(reason(item.flag_reason))}</p>
-          <div class="thread">${esc(item.body_text || item.snippet || "")}</div>`;
+      const h = new URLSearchParams(location.hash.slice(1));
+      try { state.cfg = await api("/api/accounts"); } catch { state.cfg = { accounts: [] }; }
+      renderAccounts();
+      $("tabs").onclick = (e) => {
+        const btn = e.target.closest("button"); if (!btn) return;
+        state.category = btn.dataset.cat;
+        [...$("tabs").children].forEach((x) => x.classList.toggle("on", x === btn));
+        loadInbox();
       };
+      $("nav").onclick = (e) => {
+        const btn = e.target.closest("button"); if (!btn) return;
+        setView(btn.dataset.view);
+      };
+      $("syncBtn").onclick = startSync;
+      $("q").addEventListener("keydown", (e) => { if (e.key === "Enter") { state.q = $("q").value.trim(); loadInbox(); } });
+      $("cpBtn").onclick = () => toggleCopilot();
+      $("cpClose").onclick = () => toggleCopilot(false);
+      $("cpCtxClear").onclick = () => { state.cpUseSelection = false; renderCpContext(); };
+      $("cpSend").onclick = () => sendChat();
+      $("cpAsk").addEventListener("keydown", (e) => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); sendChat(); } });
+      $("mCancel").onclick = () => closeModal();
+      $("mCopy").onclick = () => copyText($("mBody").value, T("copied"));
+      $("mSave").onclick = saveModalDraft;
+      $("langBtn").onclick = () => { state.lang = zh() ? "en" : "zh"; localStorage.setItem("tpi-lang", state.lang); applyLang(); if (state.view === "mail") loadInbox(); };
+      document.addEventListener("keydown", globalKeys);
+      applyLang();
+      renderWelcome();
+      if (h.get("view")) setView(h.get("view"));
+      else loadInbox();
+      if (h.get("thread")) openThread(decodeURIComponent(h.get("thread")));
+      if (h.get("copilot")) toggleCopilot(true);
+      pollHealth();
     }
 
-    document.querySelectorAll(".nav button").forEach((b) => {
-      b.onclick = () => {
-        state.view = b.dataset.view;
-        document.querySelectorAll(".nav button").forEach((x) => x.classList.toggle("on", x === b));
-        renderView();
-      };
-    });
-    document.querySelectorAll(".lang button").forEach((b) => {
-      b.onclick = () => setLang(b.dataset.lang);
-    });
-    $("syncBtn").onclick = async () => {
-      $("status").textContent = t("refreshing");
-      await api("/api/sync", { method: "POST", headers: { "Content-Type": "application/json" }, body: "{}" });
-      setTimeout(boot, 800);
-    };
-    $("searchBtn").onclick = () => { state.view = "mail"; document.querySelectorAll(".nav button").forEach((x) => x.classList.toggle("on", x.dataset.view === "mail")); loadMail(); };
-    $("q").addEventListener("keydown", (e) => { if (e.key === "Enter") loadMail(); });
-    $("skills").onclick = (e) => {
-      const b = e.target.closest("button[data-skill]");
-      if (b) runAgent(b.dataset.skill, "");
-    };
-    $("askBtn").onclick = () => runAgent("freeform", $("ask").value);
-    $("draftBtn").onclick = async () => {
-      const r = await api("/api/draft", { method: "POST", headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ subject: "TooPowerInbox draft", body: $("pane").innerText, lang: state.lang }) });
-      $("status").textContent = r.note || t("draftSaved");
-    };
+    function globalKeys(e) {
+      if (e.target.tagName === "INPUT" || e.target.tagName === "TEXTAREA") {
+        if (e.key === "Escape") e.target.blur();
+        return;
+      }
+      if (e.key === "Escape") { if ($("modalback").classList.contains("open")) closeModal(); else toggleCopilot(false); }
+      else if (e.key === "/") { e.preventDefault(); $("q").focus(); }
+      else if (e.key === "c") toggleCopilot();
+      else if (e.key === "j" || e.key === "k") {
+        if (state.view !== "mail" || !state.emails.length) return;
+        e.preventDefault();
+        const dir = e.key === "j" ? 1 : -1;
+        state.selIdx = Math.max(0, Math.min(state.emails.length - 1, state.selIdx + dir));
+        const rows = $("list").querySelectorAll(".row");
+        rows.forEach((r, i) => r.classList.toggle("on", i === state.selIdx));
+        const el = rows[state.selIdx];
+        if (el) el.scrollIntoView({ block: "nearest" });
+      }
+      else if (e.key === "Enter") {
+        if (state.view === "mail" && state.selIdx >= 0 && state.emails[state.selIdx]) openThread(state.emails[state.selIdx].id);
+      }
+    }
 
-    async function runAgent(skill, ask) {
-      $("pane").innerHTML = `<p class="muted">${t("running")}</p>`;
-      const r = await api("/api/v1/agent/run", {
-        method: "POST", headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ skill, ask, lang: state.lang }),
+    function setView(v) {
+      state.view = v;
+      [...$("nav").children].forEach((b) => b.classList.toggle("on", b.dataset.view === v));
+      $("tabs").style.display = v === "mail" ? "flex" : "none";
+      if (v === "mail") { renderWelcome(); loadInbox(); }
+      else if (v === "brain") loadBrain();
+      else if (v === "brain2") loadBrain2();
+      else if (v === "calendar") loadCal();
+      else if (v === "drafts") loadDrafts();
+    }
+
+    function renderAccounts() {
+      const acc = $("accounts"); acc.innerHTML = "";
+      const mk = (label, email) => {
+        const b = document.createElement("button");
+        b.textContent = label;
+        b.onclick = () => { state.account = email; renderAccounts(); loadInbox(); };
+        acc.appendChild(b);
+      };
+      mk(T("allAccounts"), "");
+      (state.cfg.accounts || []).forEach((a) => mk((a.label || "") + "\n" + (a.email || ""), a.email));
+      [...acc.children].forEach((b, i) => {
+        const email = i === 0 ? "" : state.cfg.accounts[i - 1].email;
+        b.classList.toggle("on", email === state.account);
       });
-      $("pane").innerHTML = `<h2>${esc(r.driver)} · ${esc(t(r.skill) === r.skill ? r.skill : t(r.skill))}</h2><div class="thread">${esc(r.answer)}</div>`;
     }
 
+    function renderTabs() {
+      $("tabs").innerHTML = TABS.map((id) =>
+        `<button data-cat="${id}" class="${id === state.category ? "on" : ""}">${esc(catName(id))}<span class="n" data-cnt="${id}"></span></button>`
+      ).join("");
+    }
+
+    async function refreshCounts() {
+      try {
+        const b = await api("/api/brain?hours=168");
+        state.brain = b;
+        const set = (id, v) => { const el = document.querySelector(`[data-cnt="${id}"]`); if (el) el.textContent = v ? String(v) : ""; };
+        let total = 0; for (const t of b.taxonomy || []) { set(t.id, (b.counts || {})[t.id] || 0); total += (b.counts || {})[t.id] || 0; }
+        set("all", total);
+        $("cnt-mail").textContent = total || "";
+        $("cnt-brain").textContent = (b.counts || {}).needs_you || "";
+        try { $("cnt-drafts").textContent = (await api("/api/drafts")).drafts?.length || ""; } catch {}
+      } catch {}
+    }
+
+    async function loadInbox() {
+      const q = new URLSearchParams({ limit: "120", category: state.category });
+      if (state.account) q.set("account", state.account);
+      const text = state.q || $("q").value.trim();
+      if (text) q.set("q", text);
+      let data;
+      try { data = await api("/api/inbox?" + q.toString()); } catch { $("list").innerHTML = "<div class='empty'>…</div>"; return; }
+      state.emails = data.emails || [];
+      state.selIdx = -1;
+      $("list").innerHTML = state.emails.map((e, i) => {
+        const dt = fmtDT(e.date_raw).slice(5, 16);
+        return `<div class="row ${e.unread ? "unread" : ""}" data-id="${esc(e.id)}" data-i="${i}">
+          <div class="dot ${esc(e.category)}"></div>
+          <div>
+            <div class="rowline">${avatarHtml(e.from_addr)}<span class="from">${esc(fromLabel(e.from_addr))}</span></div>
+            <div class="subj">${esc(e.subject || "—")}</div>
+          </div>
+          <div class="meta">${esc(dt)}<br>${esc((e.account || "").split("@")[0])}</div>
+        </div>`;
+      }).join("") || `<div class='empty'>${esc(T("emptyList"))}</div>`;
+      $("list").onclick = (ev) => {
+        const row = ev.target.closest(".row"); if (!row) return;
+        state.selIdx = parseInt(row.dataset.i, 10);
+        $("list").querySelectorAll(".row").forEach((r) => r.classList.toggle("on", r === row));
+        openThread(row.dataset.id);
+      };
+    }
+
+    function renderWelcome() {
+      $("pane").innerHTML = `
+        <h2 class="mh">${esc(T("welcomeTitle"))}</h2>
+        <div class="board">
+          <div class="card"><strong>GenMAIL 式五桶</strong><div class="muted">${zh() ? "需要你／今天之後／值得看／僅供參考／可清掉 — 本機規則自動分類，快取在你自己的資料庫。" : "Needs you / Upcoming / Worth a look / FYI / Cleanup — auto-triaged locally, cached in your own database."}</div></div>
+          <div class="card"><strong>BYO Agent Copilot</strong><div class="muted">${zh() ? "右側抽屜：摘要、待辦萃取、三版回信草稿。接你自己的模型（agent.json），零平台點數。" : "Right drawer: summaries, action extraction, three reply drafts. Bring your own model via agent.json — zero platform credits."}</div></div>
+          <div class="card"><strong>${zh() ? "安全邊界" : "Safety"}</strong><div class="muted">${zh() ? "草稿只存本機；設計上不寄信、不刪信。" : "Drafts stay local; no sending, no deletion by design."}</div></div>
+        </div>
+        <p class="hint"><kbd>j</kbd><kbd>k</kbd><kbd>Enter</kbd> · <kbd>c</kbd> Copilot · <kbd>/</kbd> ${zh() ? "搜尋" : "search"} — ${esc(T("welcomeHint"))}</p>`;
+    }
+
+    async function openThread(id) {
+      $("pane").innerHTML = "<p class='muted'>…</p>";
+      const data = await api("/api/thread/" + encodeURIComponent(id)).catch(() => ({ error: "network" }));
+      if (data.error || !data.id) { $("pane").innerHTML = `<p class='muted'>${esc(data.error || "not found")}</p>`; return; }
+      state.selected = data;
+      if (data.unread) {
+        data.unread = false;
+        api("/api/read", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ id, unread: false }) }).catch(() => {});
+        const row = $("list").querySelector(`.row[data-id="${CSS.escape(id)}"]`); if (row) row.classList.remove("unread");
+      }
+      renderCpContext();
+      const body = data.body_text || data.snippet || "";
+      const long = body.length > 700;
+      const isMd = /(^|\n)\s{0,3}(#{1,4}\s|\*\*|[-*]\s|\d+\.\s|>\s)/.test(body.slice(0, 400));
+      $("pane").innerHTML = `
+        <h2 class="mh">${esc(data.subject || "—")}</h2>
+        <p class="muted" style="margin:0">${esc(fromLabel(data.from_addr))}　&lt;${esc((data.from_addr || "").match(/<([^>]+)>/)?.[1] || data.from_addr || "")}&gt;　·　${esc(fmtDT(data.date_raw).slice(0, 26))}　·　${esc(data.account || "")}
+          <span class="badge" style="margin-left:6px">${esc(catName(data.category))}</span></p>
+        <div class="actionbar">
+          <button class="btn primary" onclick="cpAction('summarize')">${esc(T("cpSummarize"))}</button>
+          <button class="btn" onclick="cpAction('todos')">${esc(T("cpTodos"))}</button>
+          <button class="btn" onclick="cpAction('draft')">${esc(T("cpDraft"))}</button>
+          <button class="btn ghost" onclick="copyText(state.selected.body_text || state.selected.snippet || '')">${esc(T("cpCopyBody"))}</button>
+          <button class="btn ghost" onclick="toggleUnread('${esc(id)}', true)">${esc(T("cpMarkUnread"))}</button>
+        </div>
+        <div class="msg ${long ? "collapsed" : ""}">
+          <div class="msghead">${avatarHtml(data.from_addr)}<span class="who">${esc(fromLabel(data.from_addr))}</span><span class="when">${esc(fmtDT(data.date_raw).slice(0, 26))}</span></div>
+          <div class="body ${isMd ? "md" : ""}">${isMd ? mdHtml(body) : esc(body) || "—"}</div>
+          ${long ? `<button class="expand">${esc(T("showFull"))}（${body.length.toLocaleString()} ${esc(T("chars"))}）…</button>` : ""}
+        </div>
+        <p class="hint"><kbd>j</kbd><kbd>k</kbd><kbd>Enter</kbd> · <kbd>c</kbd> Copilot · <kbd>/</kbd></p>`;
+      const ex = $("pane").querySelector(".expand");
+      if (ex) ex.onclick = () => { ex.closest(".msg").classList.remove("collapsed"); ex.remove(); };
+    }
+
+    function mdHtml(src) {
+      const lines = String(src || "").split("\n");
+      let html = "", list = null;
+      const flush = () => { if (list) { html += "</ul>"; list = null; } };
+      for (const ln of lines) {
+        const mH = ln.match(/^\s{0,3}#{1,4}\s+(.*)$/);
+        const mB = ln.match(/^\s{0,3}[-*•]\s+(.*)$/);
+        const mN = ln.match(/^\s{0,3}\d+[.、]\s+(.*)$/);
+        const mQ = ln.match(/^\s{0,3}>\s?(.*)$/);
+        if (mH) { flush(); html += `<div class="mdh">${inline(mH[1])}</div>`; }
+        else if (mB || mN) { if (!list) { flush(); html += "<ul>"; list = true; } html += `<li>${inline(mB ? mB[1] : mN[1])}</li>`; }
+        else if (mQ) { flush(); html += `<div class="mdq" style="color:var(--muted);border-left:2px solid var(--line);padding-left:10px;margin:4px 0">${inline(mQ[1])}</div>`; }
+        else if (ln.trim() === "---") { flush(); html += `<hr style="border:none;border-top:1px solid var(--line);margin:10px 0">`; }
+        else if (!ln.trim()) { flush(); }
+        else { flush(); html += `<div>${inline(ln)}</div>`; }
+      }
+      flush();
+      return html;
+    }
+    function inline(s) {
+      return esc(s).replace(/\*\*([^*]+)\*\*/g, "<strong>$1</strong>").replace(/`([^`]+)`/g, "<code style='background:#26211b;padding:0 4px;border-radius:3px;font-size:12px'>$1</code>");
+    }
+
+    async function toggleUnread(id, unread) {
+      await api("/api/read", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ id, unread }) }).catch(() => {});
+      await loadInbox();
+    }
+
+    async function loadBrain() {
+      const data = state.brain && state.brain.taxonomy ? state.brain : await api("/api/brain?hours=168");
+      state.brain = data;
+      const order = data.taxonomy || [];
+      $("list").innerHTML = order.map((t) =>
+        (data.todos[t.id] || []).slice(0, 12).map((e) => `
+          <div class="row" data-id="${esc(e.id)}">
+            <div class="dot ${esc(e.category)}"></div>
+            <div><div class="rowline"><span class="from" style="font-size:13px">${esc(zh() ? S.zh.cats[t.id] : t.name)} · ${esc(fromLabel(e.from_addr))}</span></div>
+            <div class="subj">${esc(e.text || "")}</div></div>
+          </div>`).join("")
+      ).join("") || "<div class='empty'>—</div>";
+      $("list").onclick = (ev) => {
+        const row = ev.target.closest(".row");
+        if (row && row.dataset.id && !row.dataset.id.startsWith("cal:")) openThread(row.dataset.id);
+      };
+      $("pane").innerHTML = `<h2 class="mh">${zh() ? "五桶大腦看板" : "Five-bucket triage board"}</h2>
+        <p class="muted">${zh() ? "時間窗" : "Window"} ${data.window_hours}h · ${esc(data.source || "")}</p>
+        <div class="board">${order.map((t) => `<div class="card"><strong>${esc(zh() ? S.zh.cats[t.id] : t.name)}</strong>　${(data.counts || {})[t.id] || 0}<div class="muted">${esc(t.description || "")}</div></div>`).join("")}</div>`;
+    }
+
+    async function loadBrain2() {
+      const [cards, overview] = await Promise.all([
+        api("/api/second-brain").catch(() => ({ cards: [] })),
+        api("/api/overview").catch(() => ({})),
+      ]);
+      state.brainCards = cards.cards || [];
+      const p = overview.persona || {};
+      $("list").innerHTML = state.brainCards.map((c, idx) => `
+        <div class="row" onclick="showCard(${idx})">
+          <div class="dot worth_a_look"></div>
+          <div><div class="rowline"><span class="from">${esc(c.title || "—")}</span></div>
+          <div class="subj">${esc(String(c.body || c.summary || "").slice(0, 60))}</div></div>
+          <div class="meta">${esc(c.kind || "")}</div>
+        </div>`).join("") || `<div class='empty'>${esc(T("noCards"))}</div>`;
+      $("pane").innerHTML = `<h2 class="mh">${esc(T("brainTitle"))}</h2>
+        <div class="card" style="border:1px solid var(--line);border-radius:10px;padding:12px;margin-bottom:14px;background:var(--panel)">
+          <strong>${esc(T("persona"))}</strong>
+          <div class="muted" style="margin-top:6px">${esc(p.identity?.name || "")} ${esc(p.identity?.role ? "· " + p.identity.role : "")}</div>
+          ${(p.how_you_write || []).slice(0, 4).map((x) => `<div class="muted" style="font-size:12.5px">· ${esc(x)}</div>`).join("")}
+          ${(p.attention_now || []).slice(0, 4).map((x) => `<div class="muted" style="font-size:12.5px">⚠ ${esc(x)}</div>`).join("")}
+        </div>
+        <div class="brainform">
+          <input id="cardTitle" placeholder="${esc(T("cardTitle"))}" />
+          <textarea id="cardBody" placeholder="${esc(T("cardBody"))}"></textarea>
+          <div><button class="btn primary" onclick="addCard()">${esc(T("addCard"))}</button></div>
+        </div>
+        <p class="hint">${esc(T("rebuildHint"))}</p>`;
+    }
+    window.showCard = (idx) => {
+      const c = state.brainCards[idx]; if (!c) return;
+      const node = $("pane").querySelector("h2");
+      if (node) node.insertAdjacentHTML("afterend", `<div class="card" style="border:1px solid var(--line);border-radius:10px;padding:12px;margin:10px 0;background:var(--panel)"><strong>${esc(c.title)}</strong><div class="muted" style="margin-top:6px;white-space:pre-wrap">${esc(c.body || "")}</div></div>`);
+    };
+    window.addCard = async () => {
+      const title = $("cardTitle").value.trim() || "note";
+      const body = $("cardBody").value.trim();
+      if (!body) return;
+      await api("/api/second-brain", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ title, body, kind: "note" }) }).catch(() => null);
+      toast(T("saved")); loadBrain2();
+    };
+
+    async function loadCal() {
+      const data = await api("/api/calendar").catch(() => ({ events: [] }));
+      const events = data.events || [];
+      state.calEvents = events;
+      $("cnt-cal").textContent = events.length || "";
+      $("list").innerHTML = events.map((e, idx) => `
+        <div class="row" onclick="showCalDetail(${idx})">
+          <div class="dot upcoming"></div>
+          <div><div class="rowline"><span class="from">${esc(e.title || "(no title)")}</span></div>
+          <div class="subj">${esc(fmtDT(e.start_local).slice(0, 16))} → ${esc(fmtDT(e.end_local).slice(11, 16))}</div></div>
+          <div class="meta">${esc(fmtDT(e.start_local).slice(5, 10))}</div>
+        </div>`).join("") || `<div class='empty'>${esc(T("noEvents"))}</div>`;
+      $("pane").innerHTML = `<h2 class="mh">${zh() ? "日曆" : "Calendar"}</h2>
+        <p class="muted">${zh() ? "未來行程（同步時抓取）" : "Upcoming events (fetched on sync)"} · ${events.length}</p>`;
+    }
+    window.showCalDetail = (idx) => {
+      const e = state.calEvents[idx]; if (!e) return;
+      $("pane").innerHTML = `<h2 class="mh">${esc(e.title || "")}</h2>
+        <div class="card" style="border:1px solid var(--line);border-radius:10px;padding:12px;background:var(--panel)">
+          <p><strong>${zh() ? "開始" : "Start"}:</strong> <code>${esc(e.start_local || "")}</code>　<strong>${zh() ? "結束" : "End"}:</strong> <code>${esc(e.end_local || "")}</code></p>
+        </div>`;
+    };
+
+    async function loadDrafts() {
+      const data = await api("/api/drafts").catch(() => ({ drafts: [] }));
+      state.drafts = data.drafts || [];
+      $("list").innerHTML = state.drafts.map((d, idx) => `
+        <div class="row" onclick="showDraft(${idx})">
+          <div class="dot worth_a_look"></div>
+          <div><div class="rowline"><span class="from">${esc(d.to_addr || "—")}</span></div>
+          <div class="subj">${esc(d.subject || "")}</div></div>
+          <div class="meta">${esc((d.created_at || "").slice(5, 16))}<br>local</div>
+        </div>`).join("") || `<div class='empty'>${esc(T("emptyDrafts"))}</div>`;
+      $("pane").innerHTML = `<h2 class="mh">${esc(T("draftsTitle"))}</h2>
+        <p class="muted">${state.drafts.length} · ${esc(T("draftsHint"))}</p>`;
+    }
+    window.showDraft = (idx) => {
+      const d = state.drafts[idx]; if (!d) return;
+      $("pane").innerHTML = `<h2 class="mh">${esc(d.subject || "")}</h2>
+        <p class="muted">${esc(d.to_addr || "—")}　·　${esc(d.created_at || "")}</p>
+        <div class="actionbar">
+          <button class="btn" onclick="showDraftEditor(${idx})">${esc(T("edit"))}</button>
+          <button class="btn ghost" onclick="copyText(state.drafts[${idx}].body, null)">${esc(T("btnCopy"))}</button>
+          <button class="btn ghost" onclick="delDraft(${d.id})">${esc(T("del"))}</button>
+        </div>
+        <div class="msg"><div class="body">${esc(d.body || "")}</div></div>`;
+    };
+    window.delDraft = async (id) => {
+      await api("/api/draft?id=" + id, { method: "DELETE" }).catch(() => {});
+      toast(T("deleted")); loadDrafts(); refreshCounts();
+    };
+
+    window.showDraftEditor = (idx) => { const d = state.drafts[idx]; if (d) openDraftModal(d); };
+    window.openDraftModal = (d) => {
+      $("mTo").value = d?.to_addr || (state.selected ? ((state.selected.from_addr || "").match(/<([^>]+)>/)?.[1] || state.selected.from_addr || "") : "");
+      $("mSubject").value = d?.subject || (state.selected ? "Re: " + (state.selected.subject || "") : "");
+      $("mBody").value = d?.body || "";
+      $("mSave").dataset.editId = d?.id || "";
+      $("modalback").classList.add("open");
+      $("mBody").focus();
+    };
+    function closeModal() { $("modalback").classList.remove("open"); }
+    async function saveModalDraft() {
+      const account = state.selected?.account || state.account || (state.cfg.accounts?.[0]?.email) || "you@example.com";
+      const body = { account, to: $("mTo").value.trim(), subject: $("mSubject").value.trim(), body: $("mBody").value, lang: zh() ? "zh-Hant" : "en" };
+      const editId = $("mSave").dataset.editId;
+      if (editId) await api("/api/draft?id=" + editId, { method: "DELETE" }).catch(() => {});
+      const r = await api("/api/draft", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) }).catch(() => null);
+      if (r && !r.error) { toast(T("saved")); closeModal(); refreshCounts(); }
+      else toast(T("saveFail"), true);
+    }
+
+    /* ── copilot ── */
+    function toggleCopilot(force) {
+      const open = force !== undefined ? force : !state.cpOpen;
+      state.cpOpen = open;
+      $("copilot").classList.toggle("open", open);
+      if (open && !$("cpMsgs").children.length) bubble("ai", T("cpWelcome"));
+      if (open) $("cpAsk").focus();
+    }
+    function renderCpContext() {
+      const has = !!(state.selected && state.cpUseSelection);
+      $("cpContext").style.display = has ? "flex" : "none";
+      if (has) $("cpCtxText").textContent = (state.selected.subject || "").slice(0, 46);
+    }
+    function bubble(kind, text, opts = {}) {
+      const d = document.createElement("div");
+      d.className = "bubble " + kind + (opts.fallback ? " fallback" : "");
+      if (opts.fallback) d.innerHTML = `<div class="fbnote">${esc(T("fbNote"))}</div>`;
+      d.appendChild(renderMd(text, opts.drafts));
+      $("cpMsgs").appendChild(d);
+      $("cpMsgs").scrollTop = $("cpMsgs").scrollHeight;
+    }
+    function renderMd(text, withDraftButtons) {
+      const wrap = document.createElement("div");
+      const lines = String(text || "").split("\n");
+      let html = "", list = null;
+      const flush = () => { if (list) { html += "</ul>"; list = null; } };
+      for (const ln of lines) {
+        const mH = ln.match(/^#{1,3}\s*(.+)$/);
+        const mB = ln.match(/^\s*[-*•]\s+(.+)$/);
+        const mN = ln.match(/^\s*\d+[.、]\s+(.+)$/);
+        if (mH) {
+          flush();
+          const label = mH[1].trim();
+          html += `<h3 class="bh">${esc(label)}</h3>`;
+          const isDraft = withDraftButtons && /^([ABC])[.、:：\s]/.test(label);
+          if (isDraft) html += `<div class="draftacts"><button class="btn" data-dact="edit" data-tag="${RegExp.$1}">${esc(T("editDraft"))}</button><button class="btn ghost" data-dact="save" data-tag="${RegExp.$1}">${esc(T("saveDraftNow"))}</button></div>`;
+        } else if (mB || mN) {
+          if (!list) { flush(); html += "<ul>"; list = true; }
+          html += `<li>${inline(mB ? mB[1] : mN[1])}</li>`;
+        } else if (!ln.trim()) { flush(); }
+        else { flush(); html += `<div>${inline(ln)}</div>`; }
+      }
+      flush();
+      wrap.innerHTML = html;
+      if (withDraftButtons) {
+        const sections = splitDrafts(text);
+        wrap.querySelectorAll("[data-dact]").forEach((b) => {
+          const sect = sections[b.dataset.tag] || "";
+          b.onclick = () => {
+            const item = state.selected || {};
+            if (b.dataset.dact === "edit") openDraftModal({ subject: "Re: " + (item.subject || ""), body: sect });
+            else {
+              api("/api/draft", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ account: item.account || "you@example.com", to: (item.from_addr || "").match(/<([^>]+)>/)?.[1] || item.from_addr || "", subject: "Re: " + (item.subject || ""), body: sect, lang: zh() ? "zh-Hant" : "en" }) })
+                .then(() => { toast(T("draftASaved")); refreshCounts(); })
+                .catch(() => toast(T("saveFail"), true));
+            }
+          };
+        });
+      }
+      return wrap;
+    }
+    function splitDrafts(text) {
+      const out = {};
+      const re = /^#{1,3}\s*([ABC])[.、:：\s]*(.*)$/gm;
+      let m, starts = [];
+      while ((m = re.exec(text))) starts.push({ tag: m[1], idx: m.index });
+      starts.forEach((s, i) => {
+        const end = i + 1 < starts.length ? starts[i + 1].idx : text.length;
+        out[s.tag] = text.slice(s.idx, end).replace(/^#{1,3}\s*[ABC][.、:：\s]*.*$\n?/m, "").trim();
+      });
+      return out;
+    }
+
+    async function cpAction(mode) {
+      if (!state.selected) return;
+      toggleCopilot(true);
+      state.cpUseSelection = true; renderCpContext();
+      const label = { summarize: T("cpSummarize"), todos: T("cpTodos"), draft: T("cpDraft") }[mode] || mode;
+      bubble("user", label + "｜" + (state.selected.subject || "").slice(0, 40));
+      await runCopilot(mode, "");
+    }
+    async function sendChat() {
+      const ask = $("cpAsk").value.trim();
+      if (!ask || state.cpBusy) return;
+      $("cpAsk").value = "";
+      bubble("user", ask);
+      await runCopilot("chat", ask);
+    }
+    async function runCopilot(mode, ask) {
+      if (state.cpBusy) return;
+      state.cpBusy = true; $("cpSend").disabled = true;
+      const t = document.createElement("div");
+      t.className = "typing"; t.innerHTML = "<span class='d'></span><span class='d'></span><span class='d'></span>&nbsp;" + esc(T("thinking"));
+      $("cpMsgs").appendChild(t); $("cpMsgs").scrollTop = $("cpMsgs").scrollHeight;
+      const itemId = (state.selected && state.cpUseSelection) ? state.selected.id : "";
+      const data = await api("/api/copilot", {
+        method: "POST", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ mode, ask, item_id: itemId, history: state.cpHistory.slice(-8), lang: zh() ? "zh-Hant" : "en" }),
+      }).catch(() => ({ error: "network" }));
+      t.remove();
+      state.cpBusy = false; $("cpSend").disabled = false;
+      if (mode === "chat" && ask) state.cpHistory.push({ role: "user", text: ask });
+      if (data.error) { bubble("ai", T("callFail") + data.error, { fallback: true }); return; }
+      state.cpHistory.push({ role: "model", text: (data.text || "").slice(0, 1500) });
+      if (state.cpHistory.length > 10) state.cpHistory = state.cpHistory.slice(-10);
+      bubble("ai", data.text || "—", { fallback: data.fallback, drafts: mode === "draft" });
+    }
+
+    function renderChips() {
+      const chips = zh() ? S.zh.chips : S.en.chips;
+      $("cpChips").innerHTML = chips.map((c, i) => `<button data-i="${i}">${esc(c.t)}</button>`).join("");
+      $("cpChips").onclick = (e) => {
+        const b = e.target.closest("button"); if (!b || state.cpBusy) return;
+        const c = chips[parseInt(b.dataset.i, 10)];
+        state.cpUseSelection = false; renderCpContext();
+        bubble("user", c.t);
+        runCopilot("chat", c.ask);
+      };
+    }
+
+    async function startSync() {
+      $("syncStatus").textContent = T("syncing");
+      await api("/api/sync", { method: "POST", headers: { "Content-Type": "application/json" }, body: "{}" }).catch(() => {});
+      let n = 0;
+      const t = setInterval(async () => {
+        n += 1;
+        const h = await api("/api/health").catch(() => null);
+        if (!h || !h.sync?.running || n > 40) {
+          clearInterval(t);
+          $("syncStatus").textContent = h?.sync?.last ? T("lastSync") + " " + h.sync.last : (h?.sync?.error || T("synced"));
+          toast(T("synced"));
+          loadInbox(); refreshCounts();
+        }
+      }, 1500);
+    }
+    function updateAgentChip(h) {
+      const driver = h?.agent || "local";
+      const live = driver && driver !== "local";
+      $("agentChip").classList.toggle("ready", !!live);
+      $("agentText").textContent = live ? `Copilot: ${driver}` : T("agentLocal");
+      $("cpSub").textContent = live ? `BYO agent · ${driver}` : (zh() ? "本機啟發式" : "local heuristic");
+    }
+    async function pollHealth() {
+      const h = await api("/api/health").catch(() => null);
+      if (!h) return;
+      updateAgentChip(h);
+      if (h.sync?.running) $("syncStatus").textContent = T("syncing");
+      else if (h.sync?.last) $("syncStatus").textContent = T("lastSync") + " " + h.sync.last;
+    }
+
+    renderChips();
     boot();
   </script>
 </body>

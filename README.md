@@ -14,11 +14,12 @@ Opens [http://127.0.0.1:8770/](http://127.0.0.1:8770/). Demo mail loads on the f
 
 ## What you get
 
-1. **Dashboard**: five-bucket triage (Needs you / Upcoming / Worth a look / FYI / Cleanup) with live bars.
-2. **Second Brain**: durable markdown cards in `vault/cards`, rebuilt from mail and calendar.
-3. **Know you better**: writing habits, inbox rules, attention, top senders (`vault/persona.md`).
-4. **`yhbmail.py`**: connectors + classifier + local cache. The mail spine.
-5. **BYO agent**: `local` / OpenAI-compatible / CLI / HTTP. See [adapters/README.md](adapters/README.md).
+1. **Inbox client**: three-pane mail UI with five-bucket triage tabs and counts, keyboard navigation (`j`/`k`/`Enter`, `/` to search, `c` for Copilot), read/unread, markdown rendering, deep links (`#thread=…`, `#copilot=1`).
+2. **Copilot drawer**: a GenMAIL-style side chat over your inbox — 30-second summary, action/deadline extraction, and three reply drafts (quick ack / full / decline) per email, with one-click save into local drafts. Runs on your BYO agent; falls back to local heuristics with a clear banner when no LLM is wired.
+3. **Second Brain**: durable markdown cards in `vault/cards`, rebuilt from mail and calendar.
+4. **Know you better**: writing habits, inbox rules, attention, top senders (`vault/persona.md`).
+5. **`yhbmail.py`**: connectors + classifier + local cache. The mail spine.
+6. **BYO agent**: `local` / OpenAI-compatible / CLI / HTTP. See [adapters/README.md](adapters/README.md).
 
 This is an architecture clone of the “email brain + unified inbox + agent” idea, not a pixel copy of any commercial client. Not affiliated with GenSpark, Super App, or any vendor mail product. Send is off. Drafts never leave the machine unless you wire that yourself.
 
@@ -30,6 +31,8 @@ GET  /api/v1/context?lang=zh-Hant
 POST /api/v1/tools/list_inbox
 POST /api/v1/agent/run
 {"ask":"今天什麼要我處理？","skill":"morning-brief","lang":"zh-Hant"}
+POST /api/copilot
+{"mode":"summarize|todos|draft|chat","item_id":"…","ask":"…","lang":"zh-Hant"}
 ```
 
 Drop extra skills as `skills/*.md`. The local driver and any CLI/HTTP worker both receive the skill text in the context pack.

@@ -412,3 +412,29 @@ def save_draft(account: str, to_addr: str, subject: str, body: str, lang: str = 
     con.close()
     note = "草稿只留本機。預設不寄信。" if str(lang).startswith("zh") else "Local draft only. Send is disabled by default."
     return {"id": did, "note": note}
+
+
+def list_drafts(limit: int = 50) -> list[dict]:
+    con = db()
+    rows = [dict(r) for r in con.execute(
+        "SELECT * FROM drafts ORDER BY id DESC LIMIT ?", (limit,))]
+    con.close()
+    return rows
+
+
+def delete_draft(draft_id: int) -> int:
+    con = db()
+    cur = con.execute("DELETE FROM drafts WHERE id=?", (int(draft_id),))
+    con.commit()
+    n = cur.rowcount
+    con.close()
+    return n
+
+
+def set_unread(item_id: str, unread: bool) -> int:
+    con = db()
+    cur = con.execute("UPDATE emails SET unread=? WHERE id=?", (1 if unread else 0, item_id))
+    con.commit()
+    n = cur.rowcount
+    con.close()
+    return n
