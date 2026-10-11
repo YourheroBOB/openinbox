@@ -2,8 +2,8 @@
 
 goal: 功能 100% 對齊 Genspark GenMail（BYOK、本機優先、不寄信）
 status: doing
-next: GB1 orchestrator 依序派工，未完成 WP：tpi-foundation、tpi-mcp、tpi-providers、tpi-triage、tpi-compose、tpi-skills、tpi-search、tpi-brain、tpi-calendar、tpi-mailops、tpi-outbox、tpi-followup、tpi-agents、tpi-mobile
-parity: 0/38（0%）　更新：2026-10-11 13:24 (UTC+8)
+next: GB1 orchestrator 依序派工，未完成 WP：tpi-mcp、tpi-providers、tpi-triage、tpi-compose、tpi-skills、tpi-search、tpi-brain、tpi-calendar、tpi-mailops、tpi-outbox、tpi-followup、tpi-agents、tpi-mobile
+parity: 2/38（5%）　更新：2026-10-11 14:00 (UTC+8)
 
 ## 運作方式
 - 正本在 GitHub；GB1 `/workspace/cursor-runs/parity/orchestrate.py` 每 15 分鐘依 work package（WP）派 `run_loop.sh`（最多 4 個平行、分支 `agent/<wp>`、各自狀態檔 `state/<wp>.md`）。
@@ -48,11 +48,11 @@ parity: 0/38（0%）　更新：2026-10-11 13:24 (UTC+8)
 | F31 | 夜班 agent：背景分流＋預備草稿＋早晨交接 | todo | tpi-followup | 單元測試：scripts/overnight 一次跑完產出 brief |
 | F32 | Super agent 動作：研究人物／公司、會議準備（BYO agent＋連接器） | todo | tpi-agents | 單元測試：research/meeting-prep 經 agent bridge |
 | F33 | GenTeam：寄信／@ 提及 agent 進 thread、成果卡片預覽 | todo | tpi-agents | 單元測試：@agent 觸發、deliverable card API |
-| F34 | Agent 連接器：MCP 伺服器（stdio JSON-RPC）提供 inbox 工具 | doing | tpi-mcp | 單元測試：initialize／tools/list／tools/call |
+| F34 | Agent 連接器：MCP 伺服器（stdio JSON-RPC）提供 inbox 工具 | review | tpi-mcp | 單元測試：initialize／tools/list／tools/call |
 | F35 | 用量／點數頁 → BYOK token 用量紀錄 | todo | tpi-skills | 單元測試：usage jsonl 記錄與 /api/usage |
 | F36 | Mac／Windows／iOS／Android → 可安裝 PWA＋行動版版面 | todo | tpi-mobile | smoke：manifest、service worker、窄螢幕版面 |
-| F37 | 隱私：信件留在信箱供應商；本機快取可清除；不經第三方伺服器 | doing | tpi-foundation | README 說明＋單元測試：/api/cache/clear |
-| F38 | Linux／雲端主機可跑（tests＋smoke 綠燈、雲端執行說明） | doing | tpi-foundation | scripts/smoke.sh＋CI unittest 綠燈 |
+| F37 | 隱私：信件留在信箱供應商；本機快取可清除；不經第三方伺服器 | done | tpi-foundation | README 說明＋單元測試：/api/cache/clear |
+| F38 | Linux／雲端主機可跑（tests＋smoke 綠燈、雲端執行說明） | done | tpi-foundation | scripts/smoke.sh＋CI unittest 綠燈 |
 
 ## 既有功能（10/10 版本已具備）
 - 三欄 inbox UI、五桶分流、鍵盤操作、已讀／未讀、深連結（smoke.yml）
@@ -63,8 +63,8 @@ parity: 0/38（0%）　更新：2026-10-11 13:24 (UTC+8)
 ## WP 狀態
 | WP | 狀態 | 依賴 | 嘗試 | PR |
 |---|---|---|---|---|
-| tpi-foundation | running | - | 1 | - |
-| tpi-mcp | running | - | 1 | - |
+| tpi-foundation | merged | - | 1 | https://github.com/YourheroBOB/openinbox/pull/2 |
+| tpi-mcp | pr-review | - | 1 | https://github.com/YourheroBOB/openinbox/pull/3 |
 | tpi-providers | pending | tpi-foundation | 0 | - |
 | tpi-triage | pending | tpi-foundation | 0 | - |
 | tpi-compose | pending | tpi-foundation | 0 | - |
@@ -85,3 +85,8 @@ parity: 0/38（0%）　更新：2026-10-11 13:24 (UTC+8)
 ## log
 - [2026-10-11 13:24:00] launch tpi-foundation attempt 1 (a) log=/workspace/cursor-runs/tpi-foundation-a1.log
 - [2026-10-11 13:24:01] launch tpi-mcp attempt 1 (a) log=/workspace/cursor-runs/tpi-mcp-a1.log
+- [2026-10-11 13:24:04] STATE sync PR https://github.com/YourheroBOB/openinbox/pull/1
+- [2026-10-11 13:50:27] tpi-foundation remote test claw 60666f8: pass
+- [2026-10-11 13:50:33] tpi-mcp remote test claw d063067: pass
+- [2026-10-11 14:00:03] tpi-foundation merged https://github.com/YourheroBOB/openinbox/pull/2
+- [2026-10-11 14:00:53] defer launch: GB1 已有 3 個 run_loop（上限 3）
