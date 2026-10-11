@@ -1,0 +1,99 @@
+{
+  "comment": "Fictional sent mail for the demo inbox owner. Read by the Email Brain only; never synced or sent anywhere.",
+  "sent": [
+    {
+      "id": "demo:you@example.com:s1",
+      "account": "you@example.com",
+      "thread_id": "m7",
+      "in_reply_to": "demo:you@example.com:m7",
+      "subject": "Re: Northwind term sheet comments",
+      "from_addr": "Alex Chen <you@example.com>",
+      "to_addr": "Samira Ortiz <samira@northwind.example>",
+      "cc_addr": "Jordan Lee <jordan@quillmark.example>",
+      "date_raw": "2026-09-14 17:52",
+      "body_text": "Hi Samira,\n\nWe can concede the information right. Pro-rata stays as drafted.\n\nI'll send the marked-up term sheet tomorrow.\n\nBest,\nAlex\n--\nAlex Chen\nFounder, Quillmark Labs"
+    },
+    {
+      "id": "demo:you@example.com:s2",
+      "account": "you@example.com",
+      "thread_id": "m1",
+      "in_reply_to": "demo:you@example.com:m1",
+      "subject": "Re: Can you confirm the Friday scope before we send the deck?",
+      "from_addr": "Alex Chen <you@example.com>",
+      "to_addr": "Samira Ortiz <samira@northwind.example>",
+      "date_raw": "2026-09-16 10:04",
+      "body_text": "Hi Samira,\n\nConfirmed: keep all three slides in the Northwind deck. Cut the two lines on hiring.\n\nBest,\nAlex\n--\nAlex Chen\nFounder, Quillmark Labs"
+    },
+    {
+      "id": "demo:you@example.com:s3",
+      "account": "you@example.com",
+      "thread_id": "m4",
+      "in_reply_to": "demo:you@example.com:m4",
+      "subject": "Re: Invitation: Design review Thursday 16:00",
+      "from_addr": "Alex Chen <you@example.com>",
+      "to_addr": "Maya Singh <maya@studio.example>",
+      "date_raw": "2026-09-16 09:31",
+      "body_text": "Hi Maya,\n\nThursday 16:00 works. Can we start the design review with the onboarding screens?\n\nBest,\nAlex"
+    },
+    {
+      "id": "demo:you@example.com:s4",
+      "account": "you@example.com",
+      "thread_id": "s4",
+      "subject": "Byte Cloud renewal on the 20th: switch to annual?",
+      "from_addr": "Alex Chen <you@example.com>",
+      "to_addr": "Jordan Lee <jordan@quillmark.example>",
+      "date_raw": "2026-09-14 10:18",
+      "body_text": "Hi Jordan,\n\nByte Cloud renews on the 20th. Annual billing saves about two months. Can you check the balance before then?\n\nThanks,\nAlex"
+    },
+    {
+      "id": "demo:you@example.com:s5",
+      "account": "you@example.com",
+      "thread_id": "s5",
+      "subject": "Contract designer brief",
+      "from_addr": "Alex Chen <you@example.com>",
+      "to_addr": "Priya Nair <priya@talentloop.example>",
+      "date_raw": "2026-09-15 15:36",
+      "body_text": "Hi Priya,\n\nWe are hiring a contract designer for six weeks, starting in October. Product design, onboarding flows, some illustration.\n\nCould you share two or three portfolios by Friday?\n\nBest,\nAlex\n--\nAlex Chen\nFounder, Quillmark Labs"
+    },
+    {
+      "id": "demo:you@example.com:s6",
+      "account": "you@example.com",
+      "thread_id": "s6",
+      "subject": "Contract designer shortlist",
+      "from_addr": "Alex Chen <you@example.com>",
+      "to_addr": "Priya Nair <priya@talentloop.example>",
+      "date_raw": "2026-09-17 16:48",
+      "body_text": "Hi Priya,\n\nThanks for the portfolios. The second contract designer is a strong fit. Can we book a 30 minute call next week?\n\nBest,\nAlex"
+    },
+    {
+      "id": "demo:you@example.com:s7",
+      "account": "you@example.com",
+      "thread_id": "s7",
+      "subject": "Northwind investor call prep",
+      "from_addr": "Alex Chen <you@example.com>",
+      "to_addr": "Jordan Lee <jordan@quillmark.example>",
+      "date_raw": "2026-09-17 22:41",
+      "body_text": "Jordan,\n\nFor the Northwind investor call on Saturday: updated metrics, the hiring plan, and the pro-rata answer. Short version is fine.\n\nThanks,\nAlex"
+    },
+    {
+      "id": "demo:you@example.com:s8",
+      "account": "you@example.com",
+      "thread_id": "s8",
+      "subject": "Design review notes",
+      "from_addr": "Alex Chen <you@example.com>",
+      "to_addr": "Maya Singh <maya@studio.example>",
+      "date_raw": "2026-09-18 17:20",
+      "body_text": "Hi Maya,\n\nNotes from the design review: keep the empty states, simplify the settings page, and drop the dark banner.\n\nBest,\nAlex"
+    },
+    {
+      "id": "demo:you@example.com:s9",
+      "account": "you@example.com",
+      "thread_id": "s9",
+      "subject": "Byte Cloud 續約確認",
+      "from_addr": "Alex Chen <you@example.com>",
+      "to_addr": "Jordan Lee <jordan@quillmark.example>",
+      "date_raw": "2026-09-18 11:05",
+      "body_text": "Jordan 你好：\n\nByte Cloud 續約改成年繳，20 號前幫我確認一下帳單。\n\n謝謝！\nAlex"
+    }
+  ]
+}

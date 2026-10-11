@@ -91,7 +91,7 @@ export TPI_IMAP_ICLOUD_PASSWORD='…'   # 不要寫進任何檔案
 
 然後在面板按「重新整理」。
 
-要清掉這台機器上的快取（信件、行程、Copilot 紀錄、衍生卡片），按左側「清除本機快取」，或 `POST /api/cache/clear`（帶 `{"reseed": true}` 會重新載入示範信）。草稿與你自己寫的筆記卡保留。`GET /api/cache` 可看目前快取了什麼。
+要清掉這台機器上的快取（信件、行程、Copilot 紀錄、衍生卡片），按左側「清除本機快取」，或 `POST /api/cache/clear`（帶 `{"reseed": true}` 會重新載入示範信）。草稿與你自己寫的筆記卡保留。`GET /api/cache` 可看目前快取了什麼。你自己建立或匯入的行事曆資料也保留：本機／AI 代訂事件、邀請草稿，以及匯入的同事 ICS 行事曆（`cal_feeds`）。要移除同事行事曆，在行事曆的忙碌／空檔面板按刪除，或 `POST /api/cal/feed/delete`（`{"id": N}`）。
 
 ## 在雲端 Linux 主機執行
 

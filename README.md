@@ -91,7 +91,7 @@ Every account syncs into one inbox and each message is tagged with its account. 
 
 Then press **Refresh** in the dashboard.
 
-To wipe what this machine has cached (mail, events, Copilot history, derived cards), use **Clear local cache** in the sidebar or `POST /api/cache/clear` (`{"reseed": true}` reloads the demo mail). Drafts and the note cards you wrote stay. `GET /api/cache` shows what is cached.
+To wipe what this machine has cached (mail, events, Copilot history, derived cards), use **Clear local cache** in the sidebar or `POST /api/cache/clear` (`{"reseed": true}` reloads the demo mail). Drafts and the note cards you wrote stay. `GET /api/cache` shows what is cached. Calendar data you created or imported also stays: local / AI-booked events, invite drafts and imported colleague ICS feeds (`cal_feeds`). Remove a colleague feed with its delete button in the calendar's free/busy panel or `POST /api/cal/feed/delete` (`{"id": N}`).
 
 ## Run on a cloud Linux host
 
