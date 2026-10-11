@@ -49,6 +49,11 @@ def main(argv=None) -> int:
     import features
     import yhbmail
 
+    def fixture(name: str) -> Path:
+        p = yhbmail.ROOT / "fixtures" / name
+        return p if p.exists() else REPO / "fixtures" / name
+
+    yhbmail.FIXTURE = fixture("demo_inbox.json")
     yhbmail.init_db()
     if args.no_sync and not yhbmail.counts()["emails"]:
         cfg = yhbmail.load_cfg()
@@ -59,7 +64,11 @@ def main(argv=None) -> int:
         print("overnight: feature module failed to load: " + json.dumps(features.ERRORS, ensure_ascii=False),
               file=sys.stderr)
         return 2
-    from features import overnight
+    from features import followup, overnight, rules
+
+    followup.SENT_FIXTURE = fixture("demo_sent.json")
+    followup.DEMO_FIXTURE = fixture("followup_demo.json")
+    rules.DEMO_RULES = fixture("rules_demo.json")
 
     out, status = overnight.run(
         lang=args.lang, sync=not args.no_sync, apply_rules=args.apply_rules, drafts=not args.no_drafts,

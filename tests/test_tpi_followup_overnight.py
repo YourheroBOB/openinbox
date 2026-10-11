@@ -133,6 +133,20 @@ class OvernightTest(unittest.TestCase):
         self.assertIn("先前已有 1 份", r.stdout)
         self.assertFalse((srv.REPO / "data" / "briefs" / Path(out["brief_path"]).name).exists())
 
+    def test_script_on_an_empty_root_uses_repo_fixtures(self):
+        root = Path(tempfile.mkdtemp(prefix="tpi-night-empty-"))
+        self.addCleanup(shutil.rmtree, root, True)
+        env = {k: v for k, v in os.environ.items() if k != "OPENINBOX_ROOT"}
+        cmd = [sys.executable, str(SCRIPT), "--root", str(root), "--no-sync", "--lang", "en", "--now", fu.NOW, "--json"]
+        r = subprocess.run(cmd, capture_output=True, text=True, timeout=120, env=env)
+        self.assertEqual(r.returncode, 0, r.stderr)
+        out = json.loads(r.stdout)
+        self.assertTrue(out["ok"])
+        self.assertEqual((out["summary"]["sent"], out["summary"]["needs_you"]), (0, 2))
+        self.assertGreater(out["summary"]["overdue"], 0)
+        self.assertGreater(out["summary"]["rules_matched"], 0)
+        self.assertFalse((root / "fixtures").exists())
+
     def test_script_help(self):
         r = subprocess.run([sys.executable, str(SCRIPT), "--help"], capture_output=True, text=True, timeout=60)
         self.assertEqual(r.returncode, 0)
