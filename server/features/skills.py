@@ -1168,10 +1168,26 @@ def run_skill(slug: str, args: dict | None = None, lang: str = "en") -> tuple[di
     return result, 200
 
 
+def core_skill_switch(skill: str) -> str | None:
+    name = str(skill or "")
+    if not name or name in CORE_SKILL_SWITCH:
+        return CORE_SKILL_SWITCH.get(name)
+    # agent_bridge.skill_body opens SKILLS_DIR/<skill>.md as given, so "./find-it-for-me" or
+    # "../skills/FIND-IT-FOR-ME" (case-insensitive filesystems) reach the same prompt file
+    try:
+        base = agent_bridge.SKILLS_DIR.resolve()
+        p = (base / f"{name}.md").resolve()
+    except (OSError, ValueError):
+        return None
+    if p.parent != base:
+        return None
+    return CORE_SKILL_SWITCH.get(p.stem.lower())
+
+
 def _guard_core_agent(orig):
     @functools.wraps(orig)
     def run_agent(ask: str = "", skill: str = "", driver=None, lang: str = "en"):
-        switch = CORE_SKILL_SWITCH.get(skill or "")
+        switch = core_skill_switch(skill)
         if switch and not is_enabled(switch):
             err = disabled_error(switch, lang)
             return {"driver": "none", "skill": skill, "ask": ask, "answer": err["message"],
