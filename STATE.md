@@ -2,8 +2,8 @@
 
 goal: 功能 100% 對齊 Genspark GenMail（BYOK、本機優先、不寄信）
 status: doing
-next: GB1 orchestrator 依序派工，未完成 WP：tpi-skills、tpi-brain、tpi-calendar、tpi-mailops、tpi-outbox、tpi-followup、tpi-agents、tpi-mobile
-parity: 15/38（39%）　更新：2026-10-11 20:45 (UTC+8)
+next: GB1 orchestrator 依序派工，未完成 WP：tpi-skills、tpi-calendar、tpi-mailops、tpi-outbox、tpi-followup、tpi-agents、tpi-mobile
+parity: 17/38（45%）　更新：2026-10-11 22:15 (UTC+8)
 
 ## 運作方式
 - 正本在 GitHub；GB1 `/workspace/cursor-runs/parity/orchestrate.py` 每 15 分鐘依 work package（WP）派 `run_loop.sh`（最多 4 個平行、分支 `agent/<wp>`、各自狀態檔 `state/<wp>.md`）。
@@ -27,8 +27,8 @@ parity: 15/38（39%）　更新：2026-10-11 20:45 (UTC+8)
 | F10 | Skills：Meeting Prep／Brief this person／Turn into a slide／CRM this contact | blocked | tpi-skills | 單元測試：四技能輸出（slide=HTML/MD 檔、CRM=本機 contacts.json） |
 | F11 | 自然語言搜尋（依語意找信，含 from／日期／附件條件） | done | tpi-search | 單元測試：FTS5＋NL 查詢解析，demo 資料命中 |
 | F12 | 聯絡人搜尋與聯絡人清單 | done | tpi-search | 單元測試：/api/contacts 與搜尋 |
-| F13 | Email Brain 分頁：身分職場、寫作語氣、常聯絡人與關係、進行中專案、工作模式 | review | tpi-brain | 單元測試：/api/brain/profile 各區塊由 demo 信件推得 |
-| F14 | Email Brain「Fix」修正推論，立即影響後續行為 | review | tpi-brain | 單元測試：fix 後 profile 與 draft prompt 反映修正 |
+| F13 | Email Brain 分頁：身分職場、寫作語氣、常聯絡人與關係、進行中專案、工作模式 | done | tpi-brain | 單元測試：/api/brain/profile 各區塊由 demo 信件推得 |
+| F14 | Email Brain「Fix」修正推論，立即影響後續行為 | done | tpi-brain | 單元測試：fix 後 profile 與 draft prompt 反映修正 |
 | F15 | 統一行事曆：週／月檢視、多時區、建立事件、RSVP 狀態 | review | tpi-calendar | 單元測試＋smoke：事件 CRUD（本機）、時區轉換、RSVP 欄位 |
 | F16 | AI 代訂會議（agent 可建立事件）＋邀請草稿 | review | tpi-calendar | 單元測試：agent tool create_event＋產 .ics 邀請草稿（不寄出） |
 | F17 | 同事行事曆分享檢視＋free/busy 面板 | review | tpi-calendar | 單元測試：匯入 ICS URL/檔案、free/busy 計算 |
@@ -70,9 +70,9 @@ parity: 15/38（39%）　更新：2026-10-11 20:45 (UTC+8)
 | tpi-compose | merged | tpi-foundation | 3 | https://github.com/YourheroBOB/openinbox/pull/10 |
 | tpi-skills | needs-bob | tpi-foundation | 2 | https://github.com/YourheroBOB/openinbox/pull/12 |
 | tpi-search | merged | tpi-foundation | 2 | https://github.com/YourheroBOB/openinbox/pull/11 |
-| tpi-brain | pr-review | tpi-foundation | 1 | https://github.com/YourheroBOB/openinbox/pull/15 |
-| tpi-calendar | built | tpi-foundation | 1 | - |
-| tpi-mailops | running | tpi-foundation | 1 | - |
+| tpi-brain | merged | tpi-foundation | 1 | https://github.com/YourheroBOB/openinbox/pull/15 |
+| tpi-calendar | pr-review | tpi-foundation | 1 | https://github.com/YourheroBOB/openinbox/pull/16 |
+| tpi-mailops | retry | tpi-foundation | 1 | - |
 | tpi-outbox | pending | tpi-compose | 0 | - |
 | tpi-followup | pending | tpi-triage | 0 | - |
 | tpi-agents | pending | tpi-skills | 0 | - |
@@ -83,13 +83,6 @@ parity: 15/38（39%）　更新：2026-10-11 20:45 (UTC+8)
 - Linear HQ-1299：v2.0（分類器升級、歷史回填、情報雷達、MCP 伺服器）— YHB 專屬部分已移到私有 yhb-mail；通用 MCP 伺服器在本 repo 由 tpi-mcp 實作。
 
 ## log
-- [2026-10-11 16:00:08] launch tpi-search attempt 1 (a) log=/workspace/cursor-runs/tpi-search-a1.log
-- [2026-10-11 16:00:08] defer launch: GB1 已有 3 個 run_loop（上限 3）
-- [2026-10-11 16:00:11] STATE sync PR https://github.com/YourheroBOB/openinbox/pull/9
-- [2026-10-11 16:15:06] launch tpi-compose attempt 3 (r) log=/workspace/cursor-runs/tpi-compose-r3.log
-- [2026-10-11 16:15:07] launch tpi-skills attempt 2 (r) log=/workspace/cursor-runs/tpi-skills-r2.log
-- [2026-10-11 16:15:07] launch tpi-search attempt 2 (r) log=/workspace/cursor-runs/tpi-search-r2.log
-- [2026-10-11 16:15:07] defer launch: GB1 已有 3 個 run_loop（上限 3）
 - [2026-10-11 16:30:07] defer launch: GB1 已有 3 個 run_loop（上限 3）
 - [2026-10-11 16:45:02] tpi-compose merged https://github.com/YourheroBOB/openinbox/pull/10
 - [2026-10-11 16:45:34] tpi-skills remote test auto 43a92b2: pass
@@ -103,3 +96,10 @@ parity: 15/38（39%）　更新：2026-10-11 20:45 (UTC+8)
 - [2026-10-11 20:45:03] tpi-search merged https://github.com/YourheroBOB/openinbox/pull/11
 - [2026-10-11 20:45:39] tpi-calendar remote test auto 5c5fa8e: pass
 - [2026-10-11 20:45:43] launch tpi-mailops attempt 1 (a) log=/workspace/cursor-runs/tpi-mailops-a1.log
+- [2026-10-11 20:45:46] STATE sync PR https://github.com/YourheroBOB/openinbox/pull/17
+- [2026-10-11 22:02:37] tpi-brain merged https://github.com/YourheroBOB/openinbox/pull/15
+- [2026-10-11 22:02:55] tpi-calendar remote test auto a0aa314: FAIL
+- [2026-10-11 22:02:57] defer launch: GB1 MemAvailable 1.8G < 3.5G
+- [2026-10-11 22:02:57] defer launch: GB1 MemAvailable 1.8G < 3.5G
+- [2026-10-11 22:15:05] defer launch: GB1 MemAvailable 2.3G < 3.5G
+- [2026-10-11 22:15:05] defer launch: GB1 MemAvailable 2.3G < 3.5G
