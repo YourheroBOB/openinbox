@@ -280,7 +280,7 @@ class RulesTest(unittest.TestCase):
         self.assertEqual((s["rules_dry_run"], s["rules_applied"], s["rules_matched"], s["sent"]), (False, 0, 0, 0))
         text = " ".join(out["errors"])
         self.assertIn("rules.json has errors", text)
-        for typo in ("unknown field", "label: 1 to 40"):
+        for typo in ("archive-promos: unknown field", "tag-receipts: label: 1 to 40", "ack-northwind: unknown field"):
             self.assertIn(typo, text)
         con = sqlite3.connect(root / "data" / "openinbox.db")
         try:
