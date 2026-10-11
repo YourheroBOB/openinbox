@@ -160,7 +160,7 @@ class RsvpTest(unittest.TestCase):
         self.assertFalse(out["sent"])
         self.assertIn("not notified", out["note"])
         self.assertEqual(out["reply"]["method"], "REPLY")
-        self.assertEqual(out["reply"]["recipients"], ["maya@studio.example"])
+        self.assertEqual(out["reply"]["recipients"], ["maya@studio.example.com"])
         self.assertIn("PARTSTAT=ACCEPTED:mailto:you@example.com", out["reply"]["ics"].replace("\r\n ", ""))
         self.assertEqual(self.status_of("Design review with Maya"), "accepted")
         self.assertEqual(out["event"]["rsvp_counts"]["accepted"], 2)

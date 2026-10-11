@@ -789,7 +789,7 @@ def save_event(data: dict, lang: str = "en", source: str = "local") -> tuple[dic
         con.execute(f"UPDATE cal_events SET {sets} WHERE id=?", (*store.values(), existing["id"]))
         event_id, status = existing["id"], 200
     else:
-        uid = _clip(data.get("uid"), 300).strip() or f"{uuid.uuid4().hex}@toopowerinbox.example"
+        uid = _clip(data.get("uid"), 300).strip() or f"{uuid.uuid4().hex}@toopowerinbox.example.com"
         store.update({"uid": uid, "source": source if source in ("local", "agent", "demo", "ics") else "local",
                       "sequence": 0, "created_at": now, "updated_at": now, "my_status": my, "status": "", "transp": ""})
         cols = ", ".join(store)
@@ -895,7 +895,7 @@ def make_invite(key: str, method: str) -> dict | None:
     pub, ev = item["pub"], item["ics_ev"]
     me = me_person()
     seq = int(pub.get("sequence") or 0) + (1 if method == "CANCEL" else 0)
-    uid = pub.get("uid") or f"{hashlib.sha1(key.encode()).hexdigest()[:16]}@toopowerinbox.example"
+    uid = pub.get("uid") or f"{hashlib.sha1(key.encode()).hexdigest()[:16]}@toopowerinbox.example.com"
     attendees = [{"email": a["email"], "name": a.get("name") or "", "status": a["status"].upper(),
                   "role": a.get("role") or "REQ-PARTICIPANT"} for a in pub["attendees"]]
     body = {"uid": uid, "sequence": seq, "title": pub["title"], "start": ev["start"], "end": ev["end"],
@@ -1619,7 +1619,10 @@ def parse_ask(ask: str, now: datetime, lang: str) -> dict:
             topic = re.sub(r"\s+", " ", FILLER_ZH.sub(" ", topic)).strip(" ,.-")
             word = m.group(0)[: m.start(1) - m.start(0)].strip()
             if topic:
-                title = (word + topic) if word in ("討論", "讨论") else topic
+                if word in ("討論", "讨论"):
+                    title = word + (" " if topic[:1].isascii() else "") + topic
+                else:
+                    title = topic
                 take(m)
     if not title:
         rest = list(text)
@@ -2005,7 +2008,8 @@ def cal_freebusy(req):
     q = req.query
     tz = ics.get_tz(tz_name)
     try:
-        start = date.fromisoformat(q["start"]) if q.get("start") else range_for("week", anchor_date(s), s["week_start"])[0]
+        raw = q.get("start") or q.get("date")
+        start = date.fromisoformat(raw[:10]) if raw else range_for("week", anchor_date(s), s["week_start"])[0]
     except ValueError:
         return {"error": "start must be YYYY-MM-DD"}, 400
     ids = None

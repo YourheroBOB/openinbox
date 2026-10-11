@@ -111,6 +111,12 @@ class CreateEventToolTest(unittest.TestCase):
         self.assertEqual([p["name"] for p in fb["people"]][1:], ["Slot Tester"])
         self.assertEqual(fb["free_slots"][0]["start"], "2027-05-04T11:00", "the 09:30 booking ends at 10:00")
 
+    def test_freebusy_accepts_date_like_the_view(self):
+        status, fb = srv.get("/api/cal/freebusy?date=2027-05-04&days=2")
+        self.assertEqual(status, 200, fb)
+        self.assertEqual((fb["start"], [d["date"] for d in fb["days"]]), ("2027-05-04", ["2027-05-04", "2027-05-05"]))
+        self.assertEqual(srv.get("/api/cal/freebusy?date=05/04")[0], 400)
+
     def test_needs_a_start(self):
         status, out = srv.post("/api/cal/agent/create_event", {"title": "No time"})
         self.assertEqual(status, 400)

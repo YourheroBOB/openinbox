@@ -139,7 +139,7 @@ class RecurrenceTest(unittest.TestCase):
 
 
 class BuildTest(unittest.TestCase):
-    EV = {"uid": "draft-1@toopowerinbox.example", "sequence": 2, "title": "Roadmap; Q4, 回顧與規劃 " * 4,
+    EV = {"uid": "draft-1@toopowerinbox.example.com", "sequence": 2, "title": "Roadmap; Q4, 回顧與規劃 " * 4,
           "start": datetime(2026, 9, 15, 15, 0, tzinfo=TPE), "end": datetime(2026, 9, 15, 15, 45, tzinfo=TPE),
           "all_day": False, "location": "Room 3", "description": "line one\nline two",
           "organizer": {"email": "you@example.com", "name": "Alex Chen"},
