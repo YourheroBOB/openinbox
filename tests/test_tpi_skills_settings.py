@@ -104,6 +104,17 @@ class SettingsTest(unittest.TestCase):
                 _, on = srv.post("/api/v1/agent/run", {"skill": meta["prompt"], "lang": "en"})
                 self.assertNotEqual(on.get("error"), "skill_disabled")
 
+    def test_core_agent_route_switch_not_bypassed_by_path_spelling(self):
+        srv.post("/api/skills/settings", {"slug": "find-it", "enabled": False})
+        for name in ("./find-it-for-me", "../skills/find-it-for-me", "Find-It-For-Me", "x/../find-it-for-me"):
+            with self.subTest(skill=name):
+                _, off = srv.post("/api/v1/agent/run", {"skill": name, "lang": "en"})
+                self.assertEqual(off["error"], "skill_disabled")
+        _, other = srv.post("/api/v1/agent/run", {"skill": "../../find-it-for-me", "lang": "en"})
+        self.assertNotEqual(other.get("error"), "skill_disabled")
+        _, free = srv.post("/api/v1/agent/run", {"skill": "plan-my-week", "lang": "en"})
+        self.assertNotEqual(free.get("error"), "skill_disabled")
+
     def test_slide_of_disabled_skill_refused(self):
         srv.post("/api/skills/settings", {"slug": "morning-brief", "enabled": False})
         status, out = srv.post("/api/skills/run", {"skill": "slide", "from_skill": "morning-brief"})
