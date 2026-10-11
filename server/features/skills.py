@@ -71,8 +71,7 @@ SKILLS = [
 BY_SLUG = {s["slug"]: s for s in SKILLS}
 AGENT_SKILLS = {"morning-brief", "catch-me-up", "organize-inbox", "find-it", "meeting-prep", "brief-person"}
 # core skill prompts in skills/*.md that /api/v1/agent/run accepts -> the switch that governs them
-CORE_SKILL_SWITCH = {"morning-brief": "morning-brief", "catch-me-up": "catch-me-up",
-                     "categorize-inbox": "organize-inbox", **{s["slug"]: s["slug"] for s in SKILLS}}
+CORE_SKILL_SWITCH = {**{s["slug"]: s["slug"] for s in SKILLS}, **{s["prompt"]: s["slug"] for s in SKILLS}}
 STAGES = ("lead", "active", "customer", "partner", "vendor", "other")
 SLIDE_NAME_RE = re.compile(r"^[a-z0-9][a-z0-9\-]{0,80}\.html$")
 TAG_RE = re.compile(r"^[^\s,<>\"'&]{1,32}$")
