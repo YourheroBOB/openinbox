@@ -88,6 +88,14 @@ class LearnTest(ComposeCase):
         self.assertIn("i hope this email finds you well.", v["by_lang"]["en"]["avoid_phrases"])
         self.assertIn("Cuts phrases like “I hope this email finds you well.”.", v["traits_en"])
 
+    def test_shortened_signature_is_not_an_avoid_phrase(self):
+        for _ in range(2):
+            compose.learn("Hi Samira,\n\nConfirmed for Friday.\n\nCheers,\nAlex Chen",
+                          "Hi Samira,\n\nConfirmed for Friday, all three slides.\n\nCheers,\nAlex")
+        en = srv.get("/api/compose/voice")[1]["by_lang"]["en"]
+        self.assertNotIn("alex chen", en["avoid_phrases"])
+        self.assertNotIn("alex", en["added_phrases"])
+
     def test_placeholder_lines_are_not_avoid_phrases(self):
         ai_then_edit(M1, "Hi Samira,\n\nConfirmed.\n\nThanks,\nAlex")
         self.assertEqual(srv.get("/api/compose/voice")[1]["by_lang"]["en"]["avoid_phrases"], [])

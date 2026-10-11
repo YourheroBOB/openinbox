@@ -655,12 +655,17 @@ def shape(sentence: str) -> str:
     return _norm(QUOTED_RE.sub("“…”", sentence or ""))
 
 
+def _body_sentences(text: str) -> list[str]:
+    """Sentences between the greeting and the sign-off; the signature block is not a phrase habit."""
+    return _sentences("\n".join(_split_frame(text)[1]))
+
+
 def _phrase_counts(samples: list[dict]) -> tuple[Counter, Counter, dict]:
     removed, added, original = Counter(), Counter(), {}
     for s in samples:
-        for sent in _sentences(s["ai_text"]) + _sentences(s["final_text"]):
+        ai, final = _body_sentences(s["ai_text"]), _body_sentences(s["final_text"])
+        for sent in ai + final:
             original.setdefault(shape(sent), sent.strip())
-        ai, final = _sentences(s["ai_text"]), _sentences(s["final_text"])
         final_n, ai_n = [shape(x) for x in final], [shape(x) for x in ai]
         for sent in dict.fromkeys(ai):
             n = shape(sent)
