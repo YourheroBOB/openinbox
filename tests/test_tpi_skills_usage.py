@@ -3,6 +3,7 @@ from __future__ import annotations
 
 import json
 import os
+import secrets
 import sys
 import threading
 import unittest
@@ -14,7 +15,7 @@ import features.skills as skills
 import features.usage as usage
 
 AGENT_PATH = srv.ROOT / "agent.json"
-SECRET = "sk-test-not-a-real-key-123"
+SECRET = "fake-" + secrets.token_hex(12)
 
 
 class FakeModel(BaseHTTPRequestHandler):
