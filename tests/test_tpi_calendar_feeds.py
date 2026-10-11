@@ -101,6 +101,7 @@ class UrlImportTest(FeedTestBase):
         status, out = self.add({"url": url, "name": "Guarded"})
         self.assertEqual(status, 502, out)
         self.assertIn("private", out["error"])
+        self.assertNotIn("agent.json", out["error"], "the hint points at the feed's own allow_private box")
         self.assertEqual(self.host.hits, [], "nothing is fetched from a private host without allow_private")
         self.assertNotIn("Guarded", [f["name"] for f in srv.get("/api/cal/feeds")[1]["feeds"]])
 

@@ -956,13 +956,25 @@ def list_invites(key: str = "", limit: int = 100) -> list[dict]:
 _PARSED: dict = {}
 
 
+def _guard_message(msg: str) -> str:
+    """agent_bridge's URL guard talks about agent.json; a calendar feed opts in with its own allow_private flag."""
+    if "loopback/private" in msg:
+        return ("calendar URL resolves to a loopback/private address; tick "
+                "\"Allow private / http addresses\" (allow_private) only if it is your own or your intranet's server")
+    return msg.replace("agent endpoints", "calendar URLs").replace("agent url", "calendar URL") \
+        .replace("agent host", "calendar host")
+
+
 def fetch_ics(url: str, allow_private: bool = False) -> str:
     """GET a calendar over http(s). Every hop goes through agent_bridge._safe_url; 2 MB cap."""
     url = url.strip()
     if url.lower().startswith("webcal://"):
         url = "https://" + url[9:]
     for _ in range(4):
-        parts = urlsplit(agent_bridge._safe_url(url, allow_private=allow_private))
+        try:
+            parts = urlsplit(agent_bridge._safe_url(url, allow_private=allow_private))
+        except RuntimeError as e:
+            raise RuntimeError(_guard_message(str(e))) from None
         cls = http.client.HTTPSConnection if parts.scheme == "https" else http.client.HTTPConnection
         conn = cls(parts.hostname, parts.port or (443 if parts.scheme == "https" else 80), timeout=20)
         try:
