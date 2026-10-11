@@ -3,7 +3,7 @@
 goal: 功能 100% 對齊 Genspark GenMail（BYOK、本機優先、不寄信）
 status: doing
 next: GB1 orchestrator 依序派工，未完成 WP：tpi-skills、tpi-search、tpi-brain、tpi-calendar、tpi-mailops、tpi-outbox、tpi-followup、tpi-agents、tpi-mobile
-parity: 13/38（34%）　更新：2026-10-11 16:46 (UTC+8)
+parity: 13/38（34%）　更新：2026-10-11 17:30 (UTC+8)
 
 ## 運作方式
 - 正本在 GitHub；GB1 `/workspace/cursor-runs/parity/orchestrate.py` 每 15 分鐘依 work package（WP）派 `run_loop.sh`（最多 4 個平行、分支 `agent/<wp>`、各自狀態檔 `state/<wp>.md`）。
@@ -29,9 +29,9 @@ parity: 13/38（34%）　更新：2026-10-11 16:46 (UTC+8)
 | F12 | 聯絡人搜尋與聯絡人清單 | review | tpi-search | 單元測試：/api/contacts 與搜尋 |
 | F13 | Email Brain 分頁：身分職場、寫作語氣、常聯絡人與關係、進行中專案、工作模式 | doing | tpi-brain | 單元測試：/api/brain/profile 各區塊由 demo 信件推得 |
 | F14 | Email Brain「Fix」修正推論，立即影響後續行為 | doing | tpi-brain | 單元測試：fix 後 profile 與 draft prompt 反映修正 |
-| F15 | 統一行事曆：週／月檢視、多時區、建立事件、RSVP 狀態 | todo | tpi-calendar | 單元測試＋smoke：事件 CRUD（本機）、時區轉換、RSVP 欄位 |
-| F16 | AI 代訂會議（agent 可建立事件）＋邀請草稿 | todo | tpi-calendar | 單元測試：agent tool create_event＋產 .ics 邀請草稿（不寄出） |
-| F17 | 同事行事曆分享檢視＋free/busy 面板 | todo | tpi-calendar | 單元測試：匯入 ICS URL/檔案、free/busy 計算 |
+| F15 | 統一行事曆：週／月檢視、多時區、建立事件、RSVP 狀態 | doing | tpi-calendar | 單元測試＋smoke：事件 CRUD（本機）、時區轉換、RSVP 欄位 |
+| F16 | AI 代訂會議（agent 可建立事件）＋邀請草稿 | doing | tpi-calendar | 單元測試：agent tool create_event＋產 .ics 邀請草稿（不寄出） |
+| F17 | 同事行事曆分享檢視＋free/busy 面板 | doing | tpi-calendar | 單元測試：匯入 ICS URL/檔案、free/busy 計算 |
 | F18 | Schedule Send＋Scheduled 資料夾（可編輯／取消） | todo | tpi-outbox | 單元測試：排程佇列、取消、到期移到 outbox（本機，無寄信傳輸） |
 | F19 | Undo Send 倒數（倒數內可取消） | todo | tpi-outbox | 單元測試＋UI：倒數取消流程 |
 | F20 | 寄出前一律人工確認（agent 不代你發言） | todo | tpi-outbox | 單元測試：未確認的草稿不得進 outbox；預設無寄信傳輸 |
@@ -68,10 +68,10 @@ parity: 13/38（34%）　更新：2026-10-11 16:46 (UTC+8)
 | tpi-providers | merged | tpi-foundation | 2 | https://github.com/YourheroBOB/openinbox/pull/6 |
 | tpi-triage | merged | tpi-foundation | 3 | https://github.com/YourheroBOB/openinbox/pull/8 |
 | tpi-compose | merged | tpi-foundation | 3 | https://github.com/YourheroBOB/openinbox/pull/10 |
-| tpi-skills | built | tpi-foundation | 2 | - |
+| tpi-skills | pr-review | tpi-foundation | 2 | https://github.com/YourheroBOB/openinbox/pull/12 |
 | tpi-search | pr-review | tpi-foundation | 2 | https://github.com/YourheroBOB/openinbox/pull/11 |
 | tpi-brain | running | tpi-foundation | 1 | - |
-| tpi-calendar | pending | tpi-foundation | 0 | - |
+| tpi-calendar | running | tpi-foundation | 1 | - |
 | tpi-mailops | pending | tpi-foundation | 0 | - |
 | tpi-outbox | pending | tpi-compose | 0 | - |
 | tpi-followup | pending | tpi-triage | 0 | - |
@@ -83,8 +83,6 @@ parity: 13/38（34%）　更新：2026-10-11 16:46 (UTC+8)
 - Linear HQ-1299：v2.0（分類器升級、歷史回填、情報雷達、MCP 伺服器）— YHB 專屬部分已移到私有 yhb-mail；通用 MCP 伺服器在本 repo 由 tpi-mcp 實作。
 
 ## log
-- [2026-10-11 15:30:08] defer launch: GB1 已有 3 個 run_loop（上限 3）
-- [2026-10-11 15:30:11] STATE sync PR https://github.com/YourheroBOB/openinbox/pull/7
 - [2026-10-11 15:45:26] tpi-triage remote test auto cff54c8: pass
 - [2026-10-11 15:45:30] launch tpi-compose attempt 2 (r) log=/workspace/cursor-runs/tpi-compose-r2.log
 - [2026-10-11 15:45:31] launch tpi-skills attempt 1 (a) log=/workspace/cursor-runs/tpi-skills-a1.log
@@ -101,5 +99,7 @@ parity: 13/38（34%）　更新：2026-10-11 16:46 (UTC+8)
 - [2026-10-11 16:45:02] tpi-compose merged https://github.com/YourheroBOB/openinbox/pull/10
 - [2026-10-11 16:45:34] tpi-skills remote test auto 43a92b2: pass
 - [2026-10-11 16:46:02] tpi-search remote test auto 617c4a8: pass
-- [2026-10-11 16:46:41] launch tpi-brain attempt 1 (a) log=/workspace/cursor-runs/tpi-brain-a1.log
-- [2026-10-11 16:46:41] defer launch: GB1 已有 3 個 run_loop（上限 3）
+- [2026-10-11 17:04:00] tpi-skills remote test auto a2fb8ec: FAIL
+- [2026-10-11 17:04:04] launch tpi-brain attempt 1 (a) log=/workspace/cursor-runs/tpi-brain-a1.log
+- [2026-10-11 17:04:06] launch tpi-calendar attempt 1 (a) log=/workspace/cursor-runs/tpi-calendar-a1.log
+- [2026-10-11 17:30:31] tpi-skills remote test auto 6a49fc1: pass
