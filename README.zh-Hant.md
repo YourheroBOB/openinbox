@@ -69,7 +69,7 @@ printf '%s\n' '{"jsonrpc":"2.0","id":1,"method":"initialize","params":{"protocol
 {
   "mode": "live",
   "accounts": [
-    { "email": "you@gmail.com", "platform": "gmail", "driver": "gog", "label": "工作" }
+    { "email": "you@example.com", "platform": "gmail", "driver": "gog", "label": "工作" }
   ]
 }
 ```
@@ -78,6 +78,49 @@ printf '%s\n' '{"jsonrpc":"2.0","id":1,"method":"initialize","params":{"protocol
 - `gsk`：額外 IMAP／Outlook，只走 Genspark CLI 的信件 API；TooPowerInbox 不呼叫 Super Agent
 
 然後在面板按「重新整理」。
+
+要清掉這台機器上的快取（信件、行程、Copilot 紀錄、衍生卡片），按左側「清除本機快取」，或 `POST /api/cache/clear`（帶 `{"reseed": true}` 會重新載入示範信）。草稿與你自己寫的筆記卡保留。`GET /api/cache` 可看目前快取了什麼。
+
+## 在雲端 Linux 主機執行
+
+伺服器只聽 `127.0.0.1:8770`，所以在遠端主機上要用 SSH 通道連進去。不開對外埠、不架反向代理、不寫任何部署設定。
+
+在主機上：
+
+```bash
+git clone https://github.com/YourheroBOB/openinbox.git && cd openinbox
+./install.sh
+OPENINBOX_NO_BROWSER=1 ./run.sh        # 想常駐就放進 tmux／screen
+```
+
+在你的筆電上：
+
+```bash
+ssh -N -L 8770:127.0.0.1:8770 user@your-host.example.com
+```
+
+然後在本機打開 [http://127.0.0.1:8770/](http://127.0.0.1:8770/)。筆電的 8770 被占用時，改用 `-L 8771:127.0.0.1:8770` 再開 8771。主機防火牆不要放行 8770，通道是唯一入口。`accounts.json`、`agent.json`、`data/`、`vault/` 都在主機上，那顆硬碟請當成你的信箱來保護。
+
+## 加功能
+
+放一支 `server/features/<名稱>.py`，路由會自動註冊，不必改 `server/app.py`：
+
+```python
+from features import get, post
+
+@get("/api/hello")
+def hello(req):            # req.query、req.body、req.lang_zh()
+    return {"hello": "world"}
+```
+
+介面放 `ui/modules/<名稱>.js`；`index.html` 會載入 `GET /api/ui-modules` 列出的每個模組。每個介面字串都要有 `zh` 與 `en`。`GET /api/features` 列出已載入的功能、路由與載入錯誤。
+
+## 測試
+
+```bash
+python3 -m unittest discover -s tests   # 標準函式庫 unittest，用拋棄式資料夾
+scripts/smoke.sh                        # 在 Linux 本機跑 CI 的 smoke 檢查
+```
 
 ## 目錄
 
@@ -88,8 +131,12 @@ server/second_brain.py 大腦卡片
 server/agent_bridge.py 自帶 Agent 與工具
 server/mcp_server.py   MCP 伺服器（stdio）
 server/app.py          HTTP 與面板
+server/features/       外掛路由（cache、plugins…）
 ui/index.html          可視化面板（繁中／英文）
+ui/modules/            外掛介面腳本
 skills/                晨間簡報、快速補課等
+tests/                 unittest 測試
+scripts/smoke.sh       本機 smoke 檢查
 vault/                 人格與卡片（本機，不進 git）
 ```
 

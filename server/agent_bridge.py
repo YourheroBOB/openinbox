@@ -400,7 +400,7 @@ def copilot_digest(hours: int = 72) -> str:
 
 
 def _copilot_local(mode: str, ask: str, item_id: str, lang: str) -> str:
-    from yhbmail import get_email
+    from yhbmail import ACTION_RE, get_email
     zh = _zh(lang)
     item = get_email(item_id) if item_id else None
     if item and mode == "summarize":
