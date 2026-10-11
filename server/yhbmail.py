@@ -4,6 +4,7 @@ Drivers:
   demo  — fixtures, zero setup
   gog   — Gmail via gog (https://gogcli.sh)
   gsk   — Outlook / extra boxes via Genspark CLI (transport only, no Super Agent)
+  more  — feature modules register into DRIVERS (e.g. features/imap.py, read-only IMAP)
 """
 from __future__ import annotations
 
@@ -21,6 +22,9 @@ DB = DATA / "openinbox.db"
 ACCOUNTS_PATH = ROOT / "accounts.json"
 FIXTURE = ROOT / "fixtures" / "demo_inbox.json"
 TZ = timezone(timedelta(hours=int(os.environ.get("OPENINBOX_TZ_OFFSET", "8"))))
+# driver name -> fn(account_cfg: dict, limit: int) -> list[row]; filled by feature modules.
+DRIVERS: dict = {}
+LAST_SYNC: dict = {}
 
 TAXONOMY = [
     {"id": "needs_you", "name": "Needs you", "order": 0,
@@ -305,6 +309,8 @@ def sync_all(limit: int = 25) -> dict:
                 rows = gog_search(acc["email"], "in:inbox", limit)
             elif acc.get("driver") == "gsk":
                 rows = gsk_list(acc["email"], limit)
+            elif acc.get("driver") in DRIVERS:
+                rows = DRIVERS[acc["driver"]](acc, limit)
             else:
                 rows = []
             con = db()
@@ -318,6 +324,8 @@ def sync_all(limit: int = 25) -> dict:
             })
         except Exception as e:
             report["accounts"].append({"email": acc.get("email"), "error": str(e)[:300]})
+    LAST_SYNC.clear()
+    LAST_SYNC.update({"at": now_iso(), **report})
     return report
 
 

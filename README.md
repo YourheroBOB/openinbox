@@ -45,13 +45,25 @@ Demo mode is the default. When you want live boxes, edit `accounts.json`:
 {
   "mode": "live",
   "accounts": [
-    { "email": "you@example.com", "platform": "gmail", "driver": "gog", "label": "Work" }
+    { "email": "you@example.com", "platform": "gmail", "driver": "gog", "label": "Work" },
+    { "email": "me@example.com", "driver": "imap", "provider": "icloud", "label": "iCloud",
+      "password_env": "TPI_IMAP_ICLOUD_PASSWORD" }
   ]
 }
 ```
 
 - `gog`: Gmail via [gog](https://gogcli.sh)
 - `gsk`: extra IMAP/Outlook transport through Genspark CLI (mail API only; TooPowerInbox does not call Super Agent)
+- `imap`: read-only IMAP (stdlib `imaplib`). `provider` can be `icloud`, `fastmail`, `yahoo` or `zoho`; for anything else set `host` / `port` (default 993 over SSL; `security` may be `starttls`, and `none` is allowed only on a loopback host). Optional: `username`, `mailbox` (default `INBOX`). The mailbox is opened with EXAMINE and fetched with BODY.PEEK, so nothing on the server changes, not even the read flag.
+
+IMAP passwords come only from the environment: the variable named by `password_env`, or `TPI_IMAP_PASSWORD_<EMAIL upper-cased, non-alphanumerics as _>`. A plaintext `password` in `accounts.json` is refused. iCloud needs an app-specific password for your Apple ID.
+
+```bash
+export TPI_IMAP_ICLOUD_PASSWORD='…'   # never write it into a file
+./run.sh
+```
+
+Every account syncs into one inbox and each message is tagged with its account. The sidebar **Accounts** list filters by account and shows unread counts, the driver, a missing-password hint or the last sync error; IMAP accounts get **Test connection** (`POST /api/providers/check`, login + EXAMINE only). `GET /api/providers` lists accounts with per-account counts and last sync result; it returns env var names, never passwords.
 
 Then press **Refresh** in the dashboard.
 
@@ -106,7 +118,7 @@ server/persona.py      know you better
 server/second_brain.py vault cards
 server/agent_bridge.py BYO agent + tools
 server/app.py          HTTP + dashboard
-server/features/       plug-in routes (cache, plugins, …)
+server/features/       plug-in routes (cache, plugins, imap, providers, …)
 ui/index.html          visualization panel (zh-Hant / en)
 ui/modules/            plug-in UI scripts
 skills/                morning-brief, catch-me-up, …
