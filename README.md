@@ -37,6 +37,30 @@ POST /api/copilot
 
 Drop extra skills as `skills/*.md`. The local driver and any CLI/HTTP worker both receive the skill text in the context pack.
 
+## MCP server (Claude Desktop, Cursor, any MCP client)
+
+`server/mcp_server.py` speaks MCP over stdio (JSON-RPC 2.0, one message per line: `initialize`, `tools/list`, `tools/call`, `ping`). It exposes the same five tools as the HTTP API: `list_inbox`, `brain_board`, `search_brain`, `persona`, `save_draft`. Everything is read from the local cache; `save_draft` only writes a row to the local SQLite drafts table and never sends. No network, no pip packages. The web app does not need to be running.
+
+Claude Desktop (`claude_desktop_config.json`) and Cursor (`~/.cursor/mcp.json` or `.cursor/mcp.json` in a project) use the same block. Replace `/path/to/openinbox` with your checkout:
+
+```json
+{
+  "mcpServers": {
+    "toopowerinbox": {
+      "command": "python3",
+      "args": ["/path/to/openinbox/server/mcp_server.py"],
+      "env": { "OPENINBOX_ROOT": "/path/to/openinbox" }
+    }
+  }
+}
+```
+
+`OPENINBOX_ROOT` is optional (defaults to the checkout). In demo mode the server seeds `fixtures/` on start. Quick check from a shell:
+
+```
+printf '%s\n' '{"jsonrpc":"2.0","id":1,"method":"initialize","params":{"protocolVersion":"2025-06-18","capabilities":{}}}' '{"jsonrpc":"2.0","id":2,"method":"tools/list"}' | python3 server/mcp_server.py
+```
+
 ## Real mail (optional)
 
 Demo mode is the default. When you want live boxes, edit `accounts.json`:
@@ -62,6 +86,7 @@ server/yhbmail.py      mail, taxonomy, SQLite
 server/persona.py      know you better
 server/second_brain.py vault cards
 server/agent_bridge.py BYO agent + tools
+server/mcp_server.py   MCP server (stdio)
 server/app.py          HTTP + dashboard
 ui/index.html          visualization panel (zh-Hant / en)
 skills/                morning-brief, catch-me-up, …
