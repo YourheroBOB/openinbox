@@ -37,6 +37,30 @@ POST /api/copilot
 
 額外技能就丟 `skills/*.md`。本機驅動與 CLI／HTTP worker 都會在 context pack 裡拿到技能本文。
 
+## MCP 伺服器（Claude Desktop、Cursor、任何 MCP 客戶端）
+
+`server/mcp_server.py` 以 stdio 講 MCP（JSON-RPC 2.0，一行一則訊息：`initialize`、`tools/list`、`tools/call`、`ping`），提供與 HTTP API 相同的五個工具：`list_inbox`、`brain_board`、`search_brain`、`persona`、`save_draft`。全部只讀本機快取；`save_draft` 只寫進本機 SQLite 草稿表，絕不寄出。不連網、不需 pip 套件，也不必先開網頁面板。
+
+Claude Desktop（`claude_desktop_config.json`）與 Cursor（`~/.cursor/mcp.json` 或專案內 `.cursor/mcp.json`）用同一段設定。把 `/path/to/openinbox` 換成你的 checkout 路徑：
+
+```json
+{
+  "mcpServers": {
+    "toopowerinbox": {
+      "command": "python3",
+      "args": ["/path/to/openinbox/server/mcp_server.py"],
+      "env": { "OPENINBOX_ROOT": "/path/to/openinbox" }
+    }
+  }
+}
+```
+
+`OPENINBOX_ROOT` 可省略（預設為 checkout 根目錄）。示範模式下啟動時會載入 `fixtures/` 示範資料。在終端機快速驗證：
+
+```
+printf '%s\n' '{"jsonrpc":"2.0","id":1,"method":"initialize","params":{"protocolVersion":"2025-06-18","capabilities":{}}}' '{"jsonrpc":"2.0","id":2,"method":"tools/list"}' | python3 server/mcp_server.py
+```
+
 ## 真信箱（可選）
 
 預設是示範模式。要接真信箱就改 `accounts.json`：
@@ -105,6 +129,7 @@ server/yhbmail.py      信件、分類、SQLite
 server/persona.py      更了解你
 server/second_brain.py 大腦卡片
 server/agent_bridge.py 自帶 Agent 與工具
+server/mcp_server.py   MCP 伺服器（stdio）
 server/app.py          HTTP 與面板
 server/features/       外掛路由（cache、plugins…）
 ui/index.html          可視化面板（繁中／英文）
