@@ -69,13 +69,25 @@ printf '%s\n' '{"jsonrpc":"2.0","id":1,"method":"initialize","params":{"protocol
 {
   "mode": "live",
   "accounts": [
-    { "email": "you@example.com", "platform": "gmail", "driver": "gog", "label": "工作" }
+    { "email": "you@example.com", "platform": "gmail", "driver": "gog", "label": "工作" },
+    { "email": "me@example.com", "driver": "imap", "provider": "icloud", "label": "iCloud",
+      "password_env": "TPI_IMAP_ICLOUD_PASSWORD" }
   ]
 }
 ```
 
 - `gog`：Gmail，走 [gog](https://gogcli.sh)
 - `gsk`：額外 IMAP／Outlook，只走 Genspark CLI 的信件 API；TooPowerInbox 不呼叫 Super Agent
+- `imap`：唯讀 IMAP（標準函式庫 `imaplib`）。`provider` 可填 `icloud`、`fastmail`、`yahoo`、`zoho`，其他信箱改填 `host`／`port`（預設 993 SSL；`security` 可為 `starttls`，`none` 只限本機 loopback）。另可設 `username`、`mailbox`（預設 `INBOX`）。以 EXAMINE 開信箱、BODY.PEEK 抓信，伺服器上什麼都不改，連「已讀」都不會標。
+
+IMAP 密碼只從環境變數讀：`password_env` 指定的變數，沒填就讀 `TPI_IMAP_PASSWORD_<信箱大寫、非英數換成 _>`。`accounts.json` 裡放明文 `password` 會被拒絕。iCloud 要用 Apple ID 的 App 專用密碼。
+
+```bash
+export TPI_IMAP_ICLOUD_PASSWORD='…'   # 不要寫進任何檔案
+./run.sh
+```
+
+所有帳號同步進同一個收件匣，每封信都標上帳號；左側「信箱」可依帳號篩選，顯示未讀數、驅動類型、缺密碼或上次同步錯誤，IMAP 帳號有「測試連線」（`POST /api/providers/check`，只登入＋EXAMINE）。`GET /api/providers` 列出帳號、各帳號信件數與上次同步結果，只回環境變數名稱，不回密碼。
 
 然後在面板按「重新整理」。
 
