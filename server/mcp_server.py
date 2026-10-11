@@ -169,6 +169,8 @@ def validate_args(name: str, args) -> dict:
         want = _TYPES[p["type"]]
         if want is int and isinstance(val, str) and val.strip().lstrip("-").isdigit():
             val = int(val)
+        if want is int and isinstance(val, float) and val.is_integer():
+            val = int(val)
         if not isinstance(val, want) or (want is int and isinstance(val, bool)):
             raise ToolArgError(f"argument {key} must be {p['type']} / 參數 {key} 型別應為 {p['type']}")
         if "enum" in p and val not in p["enum"]:

@@ -179,6 +179,8 @@ class McpStdioTest(unittest.TestCase):
         self.assertTrue(got)
         self.assertTrue(all(e["category"] == cat for e in got))
         self.assertEqual(len(self.payload(self.mcp.call("list_inbox", {"limit": "2"}))["emails"]), 2)
+        self.assertEqual(len(self.payload(self.mcp.call("list_inbox", {"limit": 2.0}))["emails"]), 2)
+        self.assertTrue(self.mcp.call("list_inbox", {"limit": 2.5})["result"]["isError"])
 
     def test_brain_board(self):
         data = self.payload(self.mcp.call("brain_board", {"hours": 24 * 365}))
@@ -204,7 +206,7 @@ class McpStdioTest(unittest.TestCase):
 
     def test_save_draft_is_local_only(self):
         data = self.payload(self.mcp.call("save_draft", {
-            "to": "samira@northwind.example", "subject": "Re: scope", "body": "Confirmed, thanks.",
+            "to": "client@example.com", "subject": "Re: scope", "body": "Confirmed, thanks.",
         }))
         self.assertIs(data["sent"], False)
         self.assertIn("Local draft only", data["note"])
@@ -216,7 +218,7 @@ class McpStdioTest(unittest.TestCase):
         rows = con.execute("SELECT id, account, to_addr, subject, body FROM drafts ORDER BY id").fetchall()
         con.close()
         by_id = {r[0]: r for r in rows}
-        self.assertEqual(by_id[data["id"]][1:], ("you@example.com", "samira@northwind.example",
+        self.assertEqual(by_id[data["id"]][1:], ("you@example.com", "client@example.com",
                                                  "Re: scope", "Confirmed, thanks."))
         self.assertEqual(by_id[zh["id"]][3:], ("回覆：範圍", "已確認，謝謝。"))
 

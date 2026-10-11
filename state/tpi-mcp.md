@@ -14,3 +14,4 @@ next: 無必要後續；可選：若 main 之後加入 server/features/ 外掛�
 
 ## log
 - 2026-10-11 13:40 (UTC+8) 新增 mcp_server.py、tests/test_tpi_mcp_stdio.py（subprocess 實際驅動 stdio，暫存 OPENINBOX_ROOT）、tests/test_tpi_mcp_policy.py（禁寄信字樣、僅標準函式庫、無部署設定、README 佔位、fixture 網域）；驗證：`python3 -m unittest discover -s tests` 21 tests OK、手動 printf 管線 initialize/tools/list/save_draft 正常、app.py 於 8799 啟動 /api/health 正常；scripts/smoke.sh 不存在。
+- 2026-10-11 13:33 (UTC+8) review pass：重跑 `python3 -m unittest discover -s tests` 21 tests OK；手動 stdio 管線五工具＋錯誤碼（-32602／-32601／-32700）正常，草稿只進暫存 OPENINBOX_ROOT 的 SQLite；以官方 MCP Inspector CLI 套 README 的 mcpServers 設定實測 tools/list 與 save_draft／list_inbox／brain_board 皆成功；app.py 於 8799 跑 smoke.yml 同款檢查通過；禁字／部署設定／workflow 字樣／非標準函式庫匯入皆無，app.py／ui／既有模組未改。小修：整數參數接受 2.0 這類整值浮點（2.5 仍報錯），測試草稿收件人改 example.com。
