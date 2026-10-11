@@ -113,6 +113,17 @@ ssh -N -L 8770:127.0.0.1:8770 user@your-host.example.com
 
 然後在本機打開 [http://127.0.0.1:8770/](http://127.0.0.1:8770/)。筆電的 8770 被占用時，改用 `-L 8771:127.0.0.1:8770` 再開 8771。主機防火牆不要放行 8770，通道是唯一入口。`accounts.json`、`agent.json`、`data/`、`vault/` 都在主機上，那顆硬碟請當成你的信箱來保護。
 
+## 安裝成 App（Mac、Windows、iOS、Android）
+
+TooPowerInbox 是可安裝的 PWA，不用另外下載原生 App。
+
+- **Mac、Windows、Linux、Android 的 Chrome／Edge**：打開 [http://127.0.0.1:8770/](http://127.0.0.1:8770/)，按左側的「📲 安裝 App」（或網址列的安裝圖示）。
+- **iPhone／iPad**：在 Safari 點「分享 → 加入主畫面」。
+
+寬度小於 760 px 時面板會切成手機版：底部分頁列（郵件、日曆、草稿、Copilot、選單）、側欄變成滑出抽屜、信件與 Copilot 以全螢幕開啟，用返回手勢關閉。主畫面捷徑可直接進郵件、日曆、草稿或 Copilot。
+
+Service worker 只在 HTTPS 或 `127.0.0.1` 上運作。手機上請用 SSH App 轉送連接埠（跟上面一樣的 `ssh -N -L 8770:127.0.0.1:8770 …`），再開 `http://127.0.0.1:8770/`；伺服器仍然只聽本機。Service worker（`/sw.js`）只快取靜態檔：離線頁、manifest、圖示與 `ui/modules/*.js`，完全不碰 `/api/*`，所以瀏覽器裡不會存任何信件。連不到伺服器時會顯示離線頁與「重試」按鈕。`GET /api/mobile/info` 列出確切快取了哪些東西。
+
 ## 加功能
 
 放一支 `server/features/<名稱>.py`，路由會自動註冊，不必改 `server/app.py`：
@@ -146,6 +157,7 @@ server/app.py          HTTP 與面板
 server/features/       外掛路由（cache、plugins…）
 ui/index.html          可視化面板（繁中／英文）
 ui/modules/            外掛介面腳本
+ui/pwa/                service worker 與離線頁（由 server/features/mobile.py 提供）
 skills/                晨間簡報、快速補課等
 tests/                 unittest 測試
 scripts/smoke.sh       本機 smoke 檢查
