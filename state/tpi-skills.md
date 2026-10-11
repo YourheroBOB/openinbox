@@ -1,0 +1,8 @@
+# tpi-skills
+
+goal: Skills 系統：Morning Brief、Catch Me Up、Organize Inbox、Find It For Me、Meeting Prep、Brief this person、Turn into a slide（輸出 HTML 投影片檔）、CRM this contact（本機 contacts CRM JSON），每個可在設定開關（關閉即拒跑）；BYOK token 用量紀錄 data/usage.jsonl＋/api/usage＋UI。對應 STATE.md F09 F10 F35。
+status: done
+next: 等 orchestrator 合併；之後可考慮：tpi-agents 直接沿用 `features.skills.run_skill` 與 `usage.scope()`；用量頁可加使用者自填單價（目前不猜價格）；BYO http worker 若回傳 usage 區塊已會記實數。
+
+## log
+- 2026-10-11 16:45 +08 新增 `server/features/skills.py`（8 個技能：morning-brief／catch-me-up／organize-inbox／find-it／meeting-prep／brief-person／slide／crm-contact；結果在本機規則式抽取、人名日期金額只照抄；有 BYO agent 時文字類技能再交 agent 改寫並標示來源；開關存 `data/skills.json`，關閉回 403 `skill_disabled`，同時包住核心 `/api/v1/agent/run` 讓關閉的 morning-brief／catch-me-up／categorize-inbox 也拒跑；slide 寫出獨立 HTML 投影片檔到 `data/slides/`（全部 escape、CSP meta、鍵盤翻頁、列印每頁一張），`GET /api/skills/slides[/<name>]` 提供；CRM 寫 `data/contacts.json`，`GET /api/contacts`、`POST /api/contacts/update|delete`；Organize Inbox 只提建議不搬信）與 `server/features/usage.py`（包住 agent_bridge 的 `_post_json`／`_cli` 兩個模型出口，Copilot、triage、skills、agent/run 都會記到 `data/usage.jsonl`；有 `usage` 區塊記實數、否則估算並標 estimated；只記 token 數與中繼資料，不記提示詞、回答、路徑、金鑰；`GET /api/usage` 依 driver／模型／功能／日期彙總，`POST /api/usage/clear`）。UI：`ui/modules/skills.js`（側欄「✦ 技能」：開關、各技能表單、結果、轉成投影片、聯絡人 CRM 編輯；開信時多「這個人是誰／加入 CRM／轉成投影片」按鈕）與 `ui/modules/usage.js`（側欄「📊 用量」）；繁中／英文齊全。另加 5 個 `skills/*.md` 提示檔，README 兩語各加兩行。`server/app.py`、`ui/index.html`、根目錄 STATE.md 未改。驗證：`python3 -m unittest discover -s tests` 207 OK（新增 61 個 test_tpi_skills_*，含本機假 OpenAI 相容端點驗 usage 實數、金鑰不落檔）；`scripts/smoke.sh` OK；暫存副本實起 server，headless Chrome（CDP）實點 17 項（技能清單、執行、關閉後按鈕停用且 API 403、重開、結果轉投影片、開信快捷鈕→CRM 存檔與編輯、信件轉投影片、用量頁、切英文、Super Agent 與郵件列表照常）全過、零 JS 錯誤。
