@@ -2,8 +2,8 @@
 
 goal: 功能 100% 對齊 Genspark GenMail（BYOK、本機優先、不寄信）
 status: doing
-next: GB1 orchestrator 依序派工，未完成 WP：tpi-providers、tpi-triage、tpi-compose、tpi-skills、tpi-search、tpi-brain、tpi-calendar、tpi-mailops、tpi-outbox、tpi-followup、tpi-agents、tpi-mobile
-parity: 3/38（8%）　更新：2026-10-11 15:00 (UTC+8)
+next: GB1 orchestrator 依序派工，未完成 WP：tpi-triage、tpi-compose、tpi-skills、tpi-search、tpi-brain、tpi-calendar、tpi-mailops、tpi-outbox、tpi-followup、tpi-agents、tpi-mobile
+parity: 4/38（11%）　更新：2026-10-11 15:30 (UTC+8)
 
 ## 運作方式
 - 正本在 GitHub；GB1 `/workspace/cursor-runs/parity/orchestrate.py` 每 15 分鐘依 work package（WP）派 `run_loop.sh`（最多 4 個平行、分支 `agent/<wp>`、各自狀態檔 `state/<wp>.md`）。
@@ -15,14 +15,14 @@ parity: 3/38（8%）　更新：2026-10-11 15:00 (UTC+8)
 
 | # | 功能 | 狀態 | WP | 測試 |
 |---|---|---|---|---|
-| F01 | 統一收件匣：多帳號 Gmail＋Outlook＋其他（IMAP/iCloud）一個 inbox | review | tpi-providers | tests/test_tpi_providers_*.py：gog/gsk/IMAP driver 以假資料 mock 同步進同一 inbox |
+| F01 | 統一收件匣：多帳號 Gmail＋Outlook＋其他（IMAP/iCloud）一個 inbox | done | tpi-providers | tests/test_tpi_providers_*.py：gog/gsk/IMAP driver 以假資料 mock 同步進同一 inbox |
 | F02 | Super Agent 分流：Needs You／Upcoming Today／FYI／Other 四類（對應既有五桶） | doing | tpi-triage | tests/test_tpi_triage_*.py：demo 信件分到四類、API /api/triage |
 | F03 | 每封信 AI 摘要（不開信就懂） | doing | tpi-triage | 單元測試：列表 API 每封帶 summary；無 LLM 時 heuristic |
 | F04 | 附件標記＋建議後續動作（回覆／讀附件）＋任務歷史 | doing | tpi-triage | 單元測試：has_attachment、suggested_actions、task history 存取 |
-| F05 | 撰寫器：新信／回覆／轉寄（存本機草稿） | todo | tpi-compose | 單元測試＋smoke：/api/compose 三種模式產生草稿 |
-| F06 | AI Write：依信件脈絡＋你的語氣起草；調語氣（更正式／更短／更友善）；具體指示 | todo | tpi-compose | 單元測試：tone、instruction 參數影響輸出（local driver） |
-| F07 | AI 草稿風格設定 Professional／Balanced／Casual（可逐封覆寫） | todo | tpi-compose | 單元測試：設定存取＋prompt 帶入 |
-| F08 | 從你修改草稿中學習語氣（越用越像你） | todo | tpi-compose | 單元測試：草稿 diff 存成 voice sample，persona 更新 |
+| F05 | 撰寫器：新信／回覆／轉寄（存本機草稿） | doing | tpi-compose | 單元測試＋smoke：/api/compose 三種模式產生草稿 |
+| F06 | AI Write：依信件脈絡＋你的語氣起草；調語氣（更正式／更短／更友善）；具體指示 | doing | tpi-compose | 單元測試：tone、instruction 參數影響輸出（local driver） |
+| F07 | AI 草稿風格設定 Professional／Balanced／Casual（可逐封覆寫） | doing | tpi-compose | 單元測試：設定存取＋prompt 帶入 |
+| F08 | 從你修改草稿中學習語氣（越用越像你） | doing | tpi-compose | 單元測試：草稿 diff 存成 voice sample，persona 更新 |
 | F09 | Skills：Morning Brief／Catch Me Up／Organize Inbox／Find It For Me＋可逐項開關 | todo | tpi-skills | 單元測試：四技能可跑、關閉後拒跑 |
 | F10 | Skills：Meeting Prep／Brief this person／Turn into a slide／CRM this contact | todo | tpi-skills | 單元測試：四技能輸出（slide=HTML/MD 檔、CRM=本機 contacts.json） |
 | F11 | 自然語言搜尋（依語意找信，含 from／日期／附件條件） | todo | tpi-search | 單元測試：FTS5＋NL 查詢解析，demo 資料命中 |
@@ -42,7 +42,7 @@ parity: 3/38（8%）　更新：2026-10-11 15:00 (UTC+8)
 | F25 | 一鍵行內翻譯（讀與回覆） | todo | tpi-mailops | 單元測試：/api/translate（BYO agent；無 LLM 時清楚提示） |
 | F26 | 新信通知（桌面／手機） | todo | tpi-mailops | UI：Notification API＋輪詢；單元測試 /api/new-since |
 | F27 | 帳號設定：新增／移除／排序主帳號；每帳號簽名＋匯入 | todo | tpi-mailops | 單元測試：accounts API 寫 accounts.json、signature 存取 |
-| F28 | 撰寫器中日韓字型選擇 | todo | tpi-compose | UI＋單元測試：字型設定存取 |
+| F28 | 撰寫器中日韓字型選擇 | doing | tpi-compose | UI＋單元測試：字型設定存取 |
 | F29 | 追蹤未回覆（寄出後沒回的 thread 浮上來） | todo | tpi-followup | 單元測試：N 天無回覆偵測 |
 | F30 | 自動化規則：符合條件的信自動標籤／歸檔／起草 | todo | tpi-followup | 單元測試：JSON 規則 dry-run 與套用 |
 | F31 | 夜班 agent：背景分流＋預備草稿＋早晨交接 | todo | tpi-followup | 單元測試：scripts/overnight 一次跑完產出 brief |
@@ -65,9 +65,9 @@ parity: 3/38（8%）　更新：2026-10-11 15:00 (UTC+8)
 |---|---|---|---|---|
 | tpi-foundation | merged | - | 1 | https://github.com/YourheroBOB/openinbox/pull/2 |
 | tpi-mcp | merged | - | 2 | https://github.com/YourheroBOB/openinbox/pull/3 |
-| tpi-providers | built | tpi-foundation | 2 | - |
-| tpi-triage | running | tpi-foundation | 2 | - |
-| tpi-compose | pending | tpi-foundation | 0 | - |
+| tpi-providers | merged | tpi-foundation | 2 | https://github.com/YourheroBOB/openinbox/pull/6 |
+| tpi-triage | running | tpi-foundation | 3 | - |
+| tpi-compose | running | tpi-foundation | 1 | - |
 | tpi-skills | pending | tpi-foundation | 0 | - |
 | tpi-search | pending | tpi-foundation | 0 | - |
 | tpi-brain | pending | tpi-foundation | 0 | - |
@@ -83,12 +83,6 @@ parity: 3/38（8%）　更新：2026-10-11 15:00 (UTC+8)
 - Linear HQ-1299：v2.0（分類器升級、歷史回填、情報雷達、MCP 伺服器）— YHB 專屬部分已移到私有 yhb-mail；通用 MCP 伺服器在本 repo 由 tpi-mcp 實作。
 
 ## log
-- [2026-10-11 13:24:01] launch tpi-mcp attempt 1 (a) log=/workspace/cursor-runs/tpi-mcp-a1.log
-- [2026-10-11 13:24:04] STATE sync PR https://github.com/YourheroBOB/openinbox/pull/1
-- [2026-10-11 13:50:27] tpi-foundation remote test claw 60666f8: pass
-- [2026-10-11 13:50:33] tpi-mcp remote test claw d063067: pass
-- [2026-10-11 14:00:03] tpi-foundation merged https://github.com/YourheroBOB/openinbox/pull/2
-- [2026-10-11 14:00:53] defer launch: GB1 已有 3 個 run_loop（上限 3）
 - [2026-10-11 14:00:57] STATE sync PR https://github.com/YourheroBOB/openinbox/pull/4
 - [2026-10-11 14:18:03] defer launch: GB1 MemAvailable 0.6G < 3.5G
 - [2026-10-11 14:30:03] launch tpi-mcp attempt 2 (conflict) log=/workspace/cursor-runs/tpi-mcp-conflict2.log
@@ -103,3 +97,9 @@ parity: 3/38（8%）　更新：2026-10-11 15:00 (UTC+8)
 - [2026-10-11 15:00:25] tpi-providers remote test auto 06d7b66: pass
 - [2026-10-11 15:00:30] launch tpi-triage attempt 2 (r) log=/workspace/cursor-runs/tpi-triage-r2.log
 - [2026-10-11 15:00:30] defer launch: GB1 已有 3 個 run_loop（上限 3）
+- [2026-10-11 15:00:33] STATE sync PR https://github.com/YourheroBOB/openinbox/pull/5
+- [2026-10-11 15:15:02] tpi-providers merged https://github.com/YourheroBOB/openinbox/pull/6
+- [2026-10-11 15:15:07] launch tpi-triage attempt 3 (r) log=/workspace/cursor-runs/tpi-triage-r3.log
+- [2026-10-11 15:15:07] defer launch: GB1 已有 3 個 run_loop（上限 3）
+- [2026-10-11 15:30:08] launch tpi-compose attempt 1 (a) log=/workspace/cursor-runs/tpi-compose-a1.log
+- [2026-10-11 15:30:08] defer launch: GB1 已有 3 個 run_loop（上限 3）
