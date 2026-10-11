@@ -1,0 +1,8 @@
+# tpi-outbox
+
+goal: 排程與撤回：Schedule Send（排程佇列＋Scheduled 資料夾可編輯／取消）、Undo Send 倒數取消、寄出前一律人工確認。本專案預設沒有任何寄信傳輸，到期或確認後只把信寫成 data/outbox/*.eml 並標『待使用者自行寄出』；transport 只留介面與 disabled 預設，不寫任何 SMTP 或 API 寄信程式。對應 F18 F19 F20。
+status: done
+next: 等 orchestrator 合併；之後可考慮：tpi-mailops 的 Sent 資料夾可列出「已由你自行寄出」（outbox state=done）的信；tpi-followup 的「寄出後 N 天無回覆」可用 outbox done_at 當寄出時間；tpi-agents 可呼叫 agent 工具 outbox_propose（只能提議，永遠要使用者在介面確認）
+
+## log
+- 2026-10-11 23:20 +08 還原並驗收上一輪（22:30 起）已完成但未落地的工作：工作樹被重置後原始檔遺失，從上一輪 headless 驗收用的暫存副本（22:46，晚於最後一次程式修改）逐檔比對後還原。內容：`server/features/outbox.py`——F20 寄出前一律人工確認（`POST /api/outbox/prepare` 只做快照預覽，發一次性確認碼，綁定預覽內容的 SHA-256，15 分鐘過期；`/api/outbox/confirm` 需確認碼＋`ack: true`＋內容未變，內文或主旨還有 [待填]／[TBD] 一律擋下；附件、no-reply、收件者過多會提醒；跨來源 POST 一律 403；agent 工具只有 `outbox_propose`／`outbox_list`，看不到確認碼、無法確認）、F19 Undo Send（立即模式開 5／10／20／30 秒撤回窗，預設 10，撤回放回草稿匣同一 id）、F18 Schedule Send（排程至少一分鐘後、一年內；Scheduled 資料夾可改時間、立即寫出、編輯放回草稿並記住原時間、取消）；到期由背景 ticker（`OPENINBOX_OUTBOX_TICK=0` 可關）或任一 outbox 請求補寫成 `data/outbox/<時間>-<id>-<slug>.eml`（`X-Unsent: 1`、`X-TooPowerInbox-Status: awaiting-user-send`、標「待使用者自行寄出」），寄件匣可下載 .eml、標記「我已自行寄出」、移回草稿（刪 .eml）。`server/features/_outbox_transport.py` 只有介面與 `disabled`（從不投遞，沒有任何網路或郵件協定程式）。`ui/modules/outbox.js`：撰寫器加「寄出…」「⏰ 排程…」、確認對話框（勾選才可確認、Esc 只關對話框）、撤回倒數列（`z` 快捷鍵）、側欄「⏰ 已排程」「📤 寄件匣」與寄件設定，繁中／英文齊全；`ui/modules/compose.js` 只加 `window.tpiComposer` 掛勾（存檔後關閉撰寫器）。app.py、index.html、根目錄 STATE.md 未改。驗證：`python3 -m unittest discover -s tests` 414 OK（60 個 test_tpi_outbox_*：confirm／schedule／undo／eml／ui）；`scripts/smoke.sh` OK；乾淨副本實起 server＋專用 headless Chrome（CDP）跑 16 項 UI 流程（寄出確認、Esc、撤回回撰寫器、倒數結束寫出 .eml、排程快選、改時間、編輯、取消排程、[待填] 擋確認、下載與標記已寄出、agent 提議待確認、撤回秒數設定、切英文、零 JS 錯誤）全 PASS，並檢查寫出的 .eml 標頭；寄信禁字清單掃描無命中、無部署設定、workflow 無 deploy／publish／release。
