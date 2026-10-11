@@ -2,8 +2,8 @@
 
 goal: 功能 100% 對齊 Genspark GenMail（BYOK、本機優先、不寄信）
 status: doing
-next: GB1 orchestrator 依序派工，未完成 WP：tpi-skills、tpi-outbox、tpi-followup、tpi-agents、tpi-mobile
-parity: 26/38（68%）　更新：2026-10-11 23:46 (UTC+8)
+next: GB1 orchestrator 依序派工，未完成 WP：tpi-skills、tpi-outbox、tpi-agents、tpi-mobile
+parity: 29/38（76%）　更新：2026-10-12 00:15 (UTC+8)
 
 ## 運作方式
 - 正本在 GitHub；GB1 `/workspace/cursor-runs/parity/orchestrate.py` 每 15 分鐘依 work package（WP）派 `run_loop.sh`（最多 4 個平行、分支 `agent/<wp>`、各自狀態檔 `state/<wp>.md`）。
@@ -43,9 +43,9 @@ parity: 26/38（68%）　更新：2026-10-11 23:46 (UTC+8)
 | F26 | 新信通知（桌面／手機） | done | tpi-mailops | UI：Notification API＋輪詢；單元測試 /api/new-since |
 | F27 | 帳號設定：新增／移除／排序主帳號；每帳號簽名＋匯入 | done | tpi-mailops | 單元測試：accounts API 寫 accounts.json、signature 存取 |
 | F28 | 撰寫器中日韓字型選擇 | done | tpi-compose | UI＋單元測試：字型設定存取 |
-| F29 | 追蹤未回覆（寄出後沒回的 thread 浮上來） | review | tpi-followup | 單元測試：N 天無回覆偵測 |
-| F30 | 自動化規則：符合條件的信自動標籤／歸檔／起草 | review | tpi-followup | 單元測試：JSON 規則 dry-run 與套用 |
-| F31 | 夜班 agent：背景分流＋預備草稿＋早晨交接 | review | tpi-followup | 單元測試：scripts/overnight 一次跑完產出 brief |
+| F29 | 追蹤未回覆（寄出後沒回的 thread 浮上來） | done | tpi-followup | 單元測試：N 天無回覆偵測 |
+| F30 | 自動化規則：符合條件的信自動標籤／歸檔／起草 | done | tpi-followup | 單元測試：JSON 規則 dry-run 與套用 |
+| F31 | 夜班 agent：背景分流＋預備草稿＋早晨交接 | done | tpi-followup | 單元測試：scripts/overnight 一次跑完產出 brief |
 | F32 | Super agent 動作：研究人物／公司、會議準備（BYO agent＋連接器） | todo | tpi-agents | 單元測試：research/meeting-prep 經 agent bridge |
 | F33 | GenTeam：寄信／@ 提及 agent 進 thread、成果卡片預覽 | todo | tpi-agents | 單元測試：@agent 觸發、deliverable card API |
 | F34 | Agent 連接器：MCP 伺服器（stdio JSON-RPC）提供 inbox 工具 | done | tpi-mcp | 單元測試：initialize／tools/list／tools/call |
@@ -74,18 +74,15 @@ parity: 26/38（68%）　更新：2026-10-11 23:46 (UTC+8)
 | tpi-calendar | merged | tpi-foundation | 1 | https://github.com/YourheroBOB/openinbox/pull/16 |
 | tpi-mailops | merged | tpi-foundation | 3 | https://github.com/YourheroBOB/openinbox/pull/21 |
 | tpi-outbox | needs-bob | tpi-compose | 2 | https://github.com/YourheroBOB/openinbox/pull/22 |
-| tpi-followup | pr-review | tpi-triage | 2 | https://github.com/YourheroBOB/openinbox/pull/20 |
+| tpi-followup | merged | tpi-triage | 2 | https://github.com/YourheroBOB/openinbox/pull/20 |
 | tpi-agents | pending | tpi-skills | 0 | - |
-| tpi-mobile | running | tpi-mailops | 1 | - |
+| tpi-mobile | running | tpi-mailops | 2 | - |
 
 ## 來源卡片
 - Linear HQ-1173：土炮 GenMail MVP（openinbox＋gsk 驅動＋BYOK，本機 8788 埠）。
 - Linear HQ-1299：v2.0（分類器升級、歷史回填、情報雷達、MCP 伺服器）— YHB 專屬部分已移到私有 yhb-mail；通用 MCP 伺服器在本 repo 由 tpi-mcp 實作。
 
 ## log
-- [2026-10-11 22:02:55] tpi-calendar remote test auto a0aa314: FAIL
-- [2026-10-11 22:02:57] defer launch: GB1 MemAvailable 1.8G < 3.5G
-- [2026-10-11 22:02:57] defer launch: GB1 MemAvailable 1.8G < 3.5G
 - [2026-10-11 22:15:05] defer launch: GB1 MemAvailable 2.3G < 3.5G
 - [2026-10-11 22:15:05] defer launch: GB1 MemAvailable 2.3G < 3.5G
 - [2026-10-11 22:15:08] STATE sync PR https://github.com/YourheroBOB/openinbox/pull/18
@@ -103,3 +100,6 @@ parity: 26/38（68%）　更新：2026-10-11 23:46 (UTC+8)
 - [2026-10-11 23:45:03] tpi-mailops merged https://github.com/YourheroBOB/openinbox/pull/21
 - [2026-10-11 23:46:10] tpi-followup remote test auto 3a67a97: pass
 - [2026-10-11 23:46:12] launch tpi-mobile attempt 1 (a) log=/workspace/cursor-runs/tpi-mobile-a1.log
+- [2026-10-11 23:46:16] STATE sync PR https://github.com/YourheroBOB/openinbox/pull/23
+- [2026-10-12 00:00:03] tpi-followup merged https://github.com/YourheroBOB/openinbox/pull/20
+- [2026-10-12 00:00:05] launch tpi-mobile attempt 2 (r) log=/workspace/cursor-runs/tpi-mobile-r2.log
