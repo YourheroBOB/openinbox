@@ -20,6 +20,8 @@ Opens [http://127.0.0.1:8770/](http://127.0.0.1:8770/). Demo mail loads on the f
 4. **Know you better**: writing habits, inbox rules, attention, top senders (`vault/persona.md`).
 5. **`yhbmail.py`**: connectors + classifier + local cache. The mail spine.
 6. **BYO agent**: `local` / OpenAI-compatible / CLI / HTTP. See [adapters/README.md](adapters/README.md).
+7. **Skills** (sidebar ✦ Skills, `GET /api/skills`, `POST /api/skills/run`): Morning Brief, Catch Me Up, Organize Inbox, Find It For Me, Meeting Prep, Brief this person, Turn into a slide (self-contained HTML deck in `data/slides/`), CRM this contact (local CRM in `data/contacts.json`, `GET /api/contacts`). Each has an on/off switch (`POST /api/skills/settings`, stored in `data/skills.json`); a switched-off skill refuses to run. Results are computed locally and rewritten by your BYO agent when one is wired.
+8. **BYOK usage** (sidebar 📊 Usage, `GET /api/usage`): every call to your own model appends token counts to `data/usage.jsonl` (exact when the endpoint returns `usage`, estimated otherwise). No prompts, answers or keys are logged.
 
 This is an architecture clone of the “email brain + unified inbox + agent” idea, not a pixel copy of any commercial client. Not affiliated with GenSpark, Super App, or any vendor mail product. Send is off. Drafts never leave the machine unless you wire that yourself.
 
