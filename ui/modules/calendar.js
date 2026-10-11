@@ -31,7 +31,7 @@
       importUrl: "用網址訂閱 ICS", importFile: "匯入 ICS 檔", feedName: "名稱", feedEmail: "信箱（選填）",
       allowPrivate: "允許內網／http 位址", add: "匯入", demoFeeds: "載入示範同事（虛構）", refresh: "重新整理",
       importMine: "把收到的邀請 .ics 加進我的行事曆", imported: "已匯入", events: "行程", fbBlocks: "忙碌區段",
-      privateBusy: "（忙碌）", hours: "小時",
+      privateBusy: "（忙碌）", hours: "小時", upcoming: "這段期間的行程",
     },
     en: {
       title: "Calendar", week: "Week", month: "Month", today: "Today", prev: "‹ Prev", next: "Next ›",
@@ -60,7 +60,7 @@
       importUrl: "Subscribe by ICS URL", importFile: "Import an ICS file", feedName: "Name", feedEmail: "Email (optional)",
       allowPrivate: "Allow private / http addresses", add: "Import", demoFeeds: "Load demo colleagues (fictional)", refresh: "Refresh",
       importMine: "Add a received invite .ics to my calendar", imported: "Imported", events: "events", fbBlocks: "busy blocks",
-      privateBusy: "(busy)", hours: "h",
+      privateBusy: "(busy)", hours: "h", upcoming: "In this range",
     },
   };
   const isZh = () => document.documentElement.lang.startsWith("zh");
@@ -88,83 +88,85 @@
   const HOUR = 44;
   const css = document.createElement("style");
   css.textContent = `
-    #app.tpi-cal-wide { grid-template-columns: 234px minmax(560px, 1fr) minmax(340px, 31vw); }
-    .tpi-cal { display: flex; flex-direction: column; height: 100%; min-height: 0; }
-    .tpi-cal-bar { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; padding: 10px 12px; border-bottom: 1px solid var(--line); }
-    .tpi-cal-bar .ttl { font-size: 15px; margin: 0 6px; white-space: nowrap; }
-    .tpi-cal-bar .btn { font-size: 12px; padding: 4px 9px; }
-    .tpi-cal-bar .seg { display: inline-flex; border: 1px solid var(--line); border-radius: 9px; overflow: hidden; }
-    .tpi-cal-bar .seg button { background: transparent; border: none; padding: 4px 10px; font-size: 12px; color: var(--muted); }
-    .tpi-cal-bar .seg button.on { background: #2a241d; color: var(--ink); }
-    .tpi-cal-bar .sp { flex: 1; }
-    .tpi-wk { flex: 1; min-height: 0; overflow: auto; position: relative; }
-    .tpi-wk-head, .tpi-wk-allday, .tpi-wk-body { display: grid; }
-    .tpi-wk-head { position: sticky; top: 0; z-index: 4; background: #171410; border-bottom: 1px solid var(--line); }
-    .tpi-wk-allday { position: sticky; z-index: 3; background: #171410; border-bottom: 1px solid var(--line); }
-    .tpi-wk-head > div { padding: 5px 4px; font-size: 11.5px; text-align: center; color: var(--muted); border-left: 1px solid #221e1a; }
-    .tpi-wk-head .zone { font-size: 10px; line-height: 1.25; }
-    .tpi-wk-head .zone b { color: var(--accent2); font-weight: 600; display: block; }
-    .tpi-wk-head .d.today { color: var(--accent); }
-    .tpi-wk-head .d b { display: block; font-size: 15px; color: var(--ink); font-weight: 500; }
-    .tpi-wk-head .d.today b { color: var(--accent); }
-    .tpi-wk-allday > div { min-height: 22px; border-left: 1px solid #221e1a; padding: 2px; font-size: 10.5px; color: var(--muted); }
-    .tpi-gut { position: relative; border-left: 1px solid #221e1a; }
-    .tpi-gut .hl { position: absolute; right: 4px; font-size: 10px; color: var(--muted); transform: translateY(-6px); white-space: nowrap; }
-    .tpi-gut .hl.shift { color: #7d7468; }
-    .tpi-day { position: relative; border-left: 1px solid #221e1a; cursor: crosshair; }
-    .tpi-day.weekend { background: rgba(255,255,255,.012); }
-    .tpi-day .hr { position: absolute; left: 0; right: 0; border-top: 1px solid #201c18; pointer-events: none; }
-    .tpi-day .off { position: absolute; left: 0; right: 0; background: rgba(0,0,0,.18); pointer-events: none; }
-    .tpi-now { position: absolute; left: 0; right: 0; border-top: 2px solid var(--bad); z-index: 2; pointer-events: none; }
-    .tpi-ev { position: absolute; border-radius: 6px; padding: 2px 5px; font-size: 11px; line-height: 1.3; overflow: hidden; cursor: pointer;
-      background: #3a3020; border: 1px solid #5a4a30; border-left: 3px solid var(--accent); color: var(--ink); z-index: 1; }
-    .tpi-ev:hover { z-index: 3; box-shadow: 0 4px 14px rgba(0,0,0,.45); }
-    .tpi-ev .tm { color: var(--accent2); font-size: 10px; }
-    .tpi-chip { display: block; border-radius: 5px; padding: 1px 5px; margin: 1px 0; font-size: 10.5px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; cursor: pointer;
+    #app.tcal-cal-wide { grid-template-columns: 234px minmax(560px, 1fr) minmax(340px, 31vw); }
+    .tcal-cal { display: flex; flex-direction: column; height: 100%; min-height: 0; }
+    .tcal-cal-bar { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; padding: 10px 12px; border-bottom: 1px solid var(--line); }
+    .tcal-cal-bar .ttl { font-size: 15px; margin: 0 6px; white-space: nowrap; }
+    .tcal-cal-bar .btn { font-size: 12px; padding: 4px 9px; }
+    .tcal-cal-bar .seg { display: inline-flex; border: 1px solid var(--line); border-radius: 9px; overflow: hidden; }
+    .tcal-cal-bar .seg button { background: transparent; border: none; padding: 4px 10px; font-size: 12px; color: var(--muted); }
+    .tcal-cal-bar .seg button.on { background: #2a241d; color: var(--ink); }
+    .tcal-cal-bar .sp { flex: 1; }
+    .tcal-wk { flex: 1; min-height: 0; overflow: auto; position: relative; }
+    .tcal-wk-head, .tcal-wk-allday, .tcal-wk-body { display: grid; }
+    .tcal-wk-head { position: sticky; top: 0; z-index: 4; background: #171410; border-bottom: 1px solid var(--line); }
+    .tcal-wk-allday { position: sticky; z-index: 3; background: #171410; border-bottom: 1px solid var(--line); }
+    .tcal-wk-head > div { padding: 5px 4px; font-size: 11.5px; text-align: center; color: var(--muted); border-left: 1px solid #221e1a; }
+    .tcal-wk-head .zone { font-size: 10px; line-height: 1.25; }
+    .tcal-wk-head .zone b { color: var(--accent2); font-weight: 600; display: block; }
+    .tcal-wk-head .d.today { color: var(--accent); }
+    .tcal-wk-head .d b { display: block; font-size: 15px; color: var(--ink); font-weight: 500; }
+    .tcal-wk-head .d.today b { color: var(--accent); }
+    .tcal-wk-allday > div { min-height: 22px; border-left: 1px solid #221e1a; padding: 2px; font-size: 10.5px; color: var(--muted); }
+    .tcal-gut { position: relative; border-left: 1px solid #221e1a; }
+    .tcal-gut .hl { position: absolute; right: 4px; font-size: 10px; color: var(--muted); transform: translateY(-6px); white-space: nowrap; }
+    .tcal-gut .hl.shift { color: #7d7468; }
+    .tcal-day { position: relative; border-left: 1px solid #221e1a; cursor: crosshair; }
+    .tcal-day.weekend { background: rgba(255,255,255,.012); }
+    .tcal-day .hr { position: absolute; left: 0; right: 0; border-top: 1px solid #201c18; pointer-events: none; }
+    .tcal-day .off { position: absolute; left: 0; right: 0; background: rgba(0,0,0,.18); pointer-events: none; }
+    .tcal-now { position: absolute; left: 0; right: 0; border-top: 2px solid var(--bad); z-index: 2; pointer-events: none; }
+    .tcal-ev { position: absolute; box-sizing: border-box; border-radius: 6px; padding: 2px 5px; font-size: 11px; line-height: 1.3; overflow: hidden; cursor: pointer;
+      text-align: left; background: #3a3020; border: 1px solid #5a4a30; border-left: 3px solid var(--accent); color: var(--ink); z-index: 1; }
+    .tcal-ev:hover { z-index: 3; box-shadow: 0 4px 14px rgba(0,0,0,.45); }
+    .tcal-ev .tm { color: var(--accent2); font-size: 10px; }
+    .tcal-ev.short { white-space: nowrap; text-overflow: ellipsis; padding-top: 1px; }
+    .tcal-ev.short .tm { display: inline; margin-right: 4px; }
+    .tcal-chip { display: block; border-radius: 5px; padding: 1px 5px; margin: 1px 0; font-size: 10.5px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; cursor: pointer;
       background: #3a3020; border: 1px solid #5a4a30; border-left: 3px solid var(--accent); color: var(--ink); }
-    .src-sync { border-left-color: #8a9aa8 !important; background: #232a30 !important; border-color: #3a4650 !important; }
-    .src-agent { border-left-color: var(--ok) !important; }
-    .src-ics { border-left-color: #b48ead !important; }
-    .st-tentative { background-image: repeating-linear-gradient(135deg, transparent 0 6px, rgba(255,255,255,.06) 6px 12px) !important; }
-    .st-needs-action { background: transparent !important; border-style: dashed !important; }
-    .st-declined { opacity: .45; text-decoration: line-through; }
-    .tpi-rsvp { display: inline-block; font-size: 9.5px; border-radius: 999px; padding: 0 5px; margin-left: 3px; border: 1px solid var(--line); color: var(--muted); vertical-align: 1px; text-decoration: none; }
-    .tpi-rsvp.accepted, .tpi-rsvp.organizer { color: var(--ok); border-color: #48603f; }
-    .tpi-rsvp.tentative { color: var(--accent2); border-color: #6a5a3a; }
-    .tpi-rsvp.declined { color: var(--bad); border-color: #6b3a32; }
-    .tpi-rsvp.needs-action { color: var(--need); border-color: #6b4a3a; }
-    .tpi-mo { flex: 1; min-height: 0; overflow: auto; display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)); grid-auto-rows: minmax(92px, 1fr); }
-    .tpi-mo .wd { position: sticky; top: 0; background: #171410; text-align: center; font-size: 11px; color: var(--muted); padding: 4px; border-bottom: 1px solid var(--line); min-height: 0; }
-    .tpi-mo .cell { border-right: 1px solid #221e1a; border-bottom: 1px solid #221e1a; padding: 3px 4px; min-width: 0; cursor: pointer; }
-    .tpi-mo .cell.out { opacity: .45; }
-    .tpi-mo .cell.weekend { background: rgba(255,255,255,.012); }
-    .tpi-mo .cell .dn { font-size: 11.5px; color: var(--muted); display: inline-block; padding: 0 5px; border-radius: 999px; }
-    .tpi-mo .cell.today .dn { background: var(--accent); color: #17130c; }
-    .tpi-mo .cell .mr { font-size: 10px; color: var(--muted); padding-left: 4px; }
-    .tpi-form { display: flex; flex-direction: column; gap: 8px; margin-top: 10px; }
-    .tpi-form label { font-size: 11.5px; color: var(--muted); display: flex; flex-direction: column; gap: 3px; }
-    .tpi-form label.inline { flex-direction: row; align-items: center; gap: 6px; }
-    .tpi-form input:not([type=checkbox]), .tpi-form select, .tpi-form textarea { background: #171410; border: 1px solid var(--line); border-radius: 8px; padding: 7px 9px; outline: none; color: var(--ink); }
-    .tpi-form textarea { min-height: 64px; resize: vertical; }
-    .tpi-form .two { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
-    .tpi-form .acts { display: flex; gap: 6px; flex-wrap: wrap; margin-top: 4px; }
-    .tpi-sec { margin: 16px 0 6px; font-size: 13px; color: var(--accent2); border-bottom: 1px dashed #3a332a; padding-bottom: 4px; }
-    .tpi-li { display: flex; gap: 8px; align-items: center; padding: 5px 0; border-bottom: 1px solid #221e1a; font-size: 12.5px; flex-wrap: wrap; }
-    .tpi-li .r { margin-left: auto; color: var(--muted); font-size: 11px; }
-    .tpi-li .btn { font-size: 11px; padding: 2px 8px; }
-    .tpi-note { font-size: 11.5px; color: var(--muted); padding: 7px 10px; border: 1px dashed #4a4136; border-radius: 8px; margin: 8px 0; }
-    .tpi-warn { font-size: 12px; color: var(--need); margin: 4px 0; }
-    .tpi-pre { white-space: pre-wrap; font-size: 11px; background: #120f0c; border: 1px solid var(--line); border-radius: 8px; padding: 8px; max-height: 220px; overflow: auto; font-family: ui-monospace, Menlo, monospace; }
-    .tpi-rsvpbar { display: flex; gap: 6px; flex-wrap: wrap; align-items: center; margin: 8px 0; }
-    .tpi-rsvpbar .btn.on { border-color: var(--accent); color: var(--accent2); }
-    .tpi-fb { display: grid; gap: 3px 6px; align-items: center; font-size: 11.5px; margin: 8px 0; }
-    .tpi-fb .nm { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; color: var(--ink); }
-    .tpi-fb .dh { color: var(--muted); font-size: 10.5px; text-align: center; }
-    .tpi-fb .trk { position: relative; height: 18px; background: #1e2a1d; border-radius: 4px; overflow: hidden; }
-    .tpi-fb .trk.weekend { background: #1d1b18; }
-    .tpi-fb .trk .b { position: absolute; top: 0; bottom: 0; background: #8a4a3c; border-left: 1px solid #b0604f; }
-    .tpi-fb .trk .f { position: absolute; top: 0; bottom: 0; background: rgba(126,160,122,.55); }
-    .tpi-zone { display: flex; gap: 6px; align-items: center; margin: 4px 0; }`;
+    .tcal-src-sync { border-left-color: #8a9aa8 !important; background: #232a30 !important; border-color: #3a4650 !important; }
+    .tcal-src-agent { border-left-color: var(--ok) !important; }
+    .tcal-src-ics { border-left-color: #b48ead !important; }
+    .tcal-st-tentative { background-image: repeating-linear-gradient(135deg, transparent 0 6px, rgba(255,255,255,.06) 6px 12px) !important; }
+    .tcal-st-needs-action { background: transparent !important; border-style: dashed !important; }
+    .tcal-st-declined { opacity: .45; text-decoration: line-through; }
+    .tcal-rsvp { display: inline-block; font-size: 9.5px; border-radius: 999px; padding: 0 5px; margin-left: 3px; border: 1px solid var(--line); color: var(--muted); vertical-align: 1px; text-decoration: none; }
+    .tcal-rsvp.accepted, .tcal-rsvp.organizer { color: var(--ok); border-color: #48603f; }
+    .tcal-rsvp.tentative { color: var(--accent2); border-color: #6a5a3a; }
+    .tcal-rsvp.declined { color: var(--bad); border-color: #6b3a32; }
+    .tcal-rsvp.needs-action { color: var(--need); border-color: #6b4a3a; }
+    .tcal-mo { flex: 1; min-height: 0; overflow: auto; display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)); grid-template-rows: auto; grid-auto-rows: minmax(92px, 1fr); }
+    .tcal-mo .wd { position: sticky; top: 0; background: #171410; text-align: center; font-size: 11px; color: var(--muted); padding: 4px; border-bottom: 1px solid var(--line); min-height: 0; }
+    .tcal-mo .cell { border-right: 1px solid #221e1a; border-bottom: 1px solid #221e1a; padding: 3px 4px; min-width: 0; cursor: pointer; }
+    .tcal-mo .cell.out { opacity: .45; }
+    .tcal-mo .cell.weekend { background: rgba(255,255,255,.012); }
+    .tcal-mo .cell .dn { font-size: 11.5px; color: var(--muted); display: inline-block; padding: 0 5px; border-radius: 999px; }
+    .tcal-mo .cell.today .dn { background: var(--accent); color: #17130c; }
+    .tcal-mo .cell .mr { font-size: 10px; color: var(--muted); padding-left: 4px; }
+    .tcal-form { display: flex; flex-direction: column; gap: 8px; margin-top: 10px; }
+    .tcal-form label { font-size: 11.5px; color: var(--muted); display: flex; flex-direction: column; gap: 3px; }
+    .tcal-form label.inline { flex-direction: row; align-items: center; gap: 6px; }
+    .tcal-form input:not([type=checkbox]), .tcal-form select, .tcal-form textarea { background: #171410; border: 1px solid var(--line); border-radius: 8px; padding: 7px 9px; outline: none; color: var(--ink); }
+    .tcal-form textarea { min-height: 64px; resize: vertical; }
+    .tcal-form .two { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+    .tcal-form .acts { display: flex; gap: 6px; flex-wrap: wrap; margin-top: 4px; }
+    .tcal-sec { margin: 16px 0 6px; font-size: 13px; color: var(--accent2); border-bottom: 1px dashed #3a332a; padding-bottom: 4px; }
+    .tcal-li { display: flex; gap: 8px; align-items: center; padding: 5px 0; border-bottom: 1px solid #221e1a; font-size: 12.5px; flex-wrap: wrap; }
+    .tcal-li .r { margin-left: auto; color: var(--muted); font-size: 11px; }
+    .tcal-li .btn { font-size: 11px; padding: 2px 8px; }
+    .tcal-note { font-size: 11.5px; color: var(--muted); padding: 7px 10px; border: 1px dashed #4a4136; border-radius: 8px; margin: 8px 0; }
+    .tcal-warn { font-size: 12px; color: var(--need); margin: 4px 0; }
+    .tcal-pre { white-space: pre-wrap; font-size: 11px; background: #120f0c; border: 1px solid var(--line); border-radius: 8px; padding: 8px; max-height: 220px; overflow: auto; font-family: ui-monospace, Menlo, monospace; }
+    .tcal-rsvpbar { display: flex; gap: 6px; flex-wrap: wrap; align-items: center; margin: 8px 0; }
+    .tcal-rsvpbar .btn.on { border-color: var(--accent); color: var(--accent2); }
+    .tcal-fb { display: grid; gap: 3px 6px; align-items: center; font-size: 11.5px; margin: 8px 0; }
+    .tcal-fb .nm { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; color: var(--ink); }
+    .tcal-fb .dh { color: var(--muted); font-size: 10.5px; text-align: center; }
+    .tcal-fb .trk { position: relative; height: 18px; background: #1e2a1d; border-radius: 4px; overflow: hidden; }
+    .tcal-fb .trk.weekend { background: #1d1b18; }
+    .tcal-fb .trk .b { position: absolute; top: 0; bottom: 0; background: #8a4a3c; border-left: 1px solid #b0604f; }
+    .tcal-fb .trk .f { position: absolute; top: 0; bottom: 0; background: rgba(126,160,122,.55); }
+    .tcal-zone { display: flex; gap: 6px; align-items: center; margin: 4px 0; }`;
   document.head.appendChild(css);
 
   const view = { mode: null, anchor: null, data: null, settings: null, pane: "home", detail: null, proposal: null, tzs: null };
@@ -175,8 +177,8 @@
     const d = new Date(Date.UTC(+m[1], +m[2] - 1, +m[3], +m[4], +m[5]) + minutes * 60000);
     return `${d.getUTCFullYear()}-${pad(d.getUTCMonth() + 1)}-${pad(d.getUTCDate())}T${pad(d.getUTCHours())}:${pad(d.getUTCMinutes())}`;
   };
-  const stTag = (st) => (st ? `<span class="tpi-rsvp ${h(st)}">${h(t("status")[st] || st)}</span>` : "");
-  const evCls = (e) => `src-${h(e.source)} st-${h(e.my_status || "none")}`;
+  const stTag = (st) => (st ? `<span class="tcal-rsvp ${h(st)}">${h(t("status")[st] || st)}</span>` : "");
+  const evCls = (e) => `tcal-src-${h(e.source)} tcal-st-${h(e.my_status || "none")}`;
   const paneEl = () => el("pane");
   const listEl = () => el("list");
 
@@ -188,7 +190,7 @@
   }
 
   async function load() {
-    document.getElementById("app")?.classList.add("tpi-cal-wide");
+    document.getElementById("app")?.classList.add("tcal-cal-wide");
     listEl().innerHTML = `<div class='empty'>${h(t("loading"))}</div>`;
     try {
       await ensureSettings();
@@ -205,7 +207,7 @@
 
   function renderGrid() {
     const d = view.data;
-    const bar = `<div class="tpi-cal-bar">
+    const bar = `<div class="tcal-cal-bar">
       <button class="btn" data-act="prev">${h(t("prev"))}</button>
       <button class="btn" data-act="today">${h(t("today"))}</button>
       <button class="btn" data-act="next">${h(t("next"))}</button>
@@ -218,11 +220,11 @@
       <button class="btn ghost" data-act="zones">${h(t("zones"))}</button>
       <button class="btn ghost" data-act="invites">${h(t("invites"))}</button>
     </div>`;
-    listEl().innerHTML = `<div class="tpi-cal">${bar}${view.mode === "week" ? weekHtml(d) : monthHtml(d)}</div>`;
-    const box = listEl().querySelector(".tpi-wk");
+    listEl().innerHTML = `<div class="tcal-cal">${bar}${view.mode === "week" ? weekHtml(d) : monthHtml(d)}</div>`;
+    const box = listEl().querySelector(".tcal-wk");
     if (box) {
-      const ad = box.querySelector(".tpi-wk-allday");
-      const hd = box.querySelector(".tpi-wk-head");
+      const ad = box.querySelector(".tcal-wk-allday");
+      const hd = box.querySelector(".tcal-wk-head");
       if (ad && hd) ad.style.top = hd.offsetHeight + "px";
       box.scrollTop = Math.max(0, ((view.settings?.work_start ?? 8) - 1) * HOUR);
     }
@@ -236,36 +238,38 @@
     const head = zones.map((z) => `<div class="zone" title="${h(z.tz)}"><b>${h(z.city)}</b>${h(z.offset)}</div>`).join("") +
       d.days.map((day) => `<div class="d ${day.is_today ? "today" : ""}">${h(day.weekday)}<b>${h(day.day)}</b></div>`).join("");
     const allday = zones.map((z, i) => `<div>${i === 0 ? h(t("allDay")) : ""}</div>`).join("") +
-      d.days.map((day) => `<div>${day.all_day.map((e) => `<span class="tpi-chip ${evCls(e)}" data-ev="${h(e.id)}" title="${h(e.title)}">${h(e.title)}${stTag(e.my_status)}</span>`).join("")}</div>`).join("");
-    const gutters = zones.map((z, zi) => `<div class="tpi-gut" style="height:${24 * HOUR}px">${d.hours.map((hr) => {
+      d.days.map((day) => `<div>${day.all_day.map((e) => `<span class="tcal-chip ${evCls(e)}" data-ev="${h(e.id)}" title="${h(e.title)}">${h(e.title)}${stTag(e.my_status)}</span>`).join("")}</div>`).join("");
+    const gutters = zones.map((z, zi) => `<div class="tcal-gut" style="height:${24 * HOUR}px">${d.hours.map((hr) => {
       const lb = hr.labels[zi] || {};
       return hr.hour === 0 ? "" : `<span class="hl ${lb.shift ? "shift" : ""}" style="top:${hr.hour * HOUR}px">${h(lb.label)}${lb.shift ? (lb.shift > 0 ? "⁺¹" : "⁻¹") : ""}</span>`;
     }).join("")}</div>`).join("");
     const days = d.days.map((day) => {
       const lines = Array.from({ length: 24 }, (_, i) => `<div class="hr" style="top:${i * HOUR}px"></div>`).join("");
       const off = `<div class="off" style="top:0;height:${ws * HOUR}px"></div><div class="off" style="top:${we * HOUR}px;height:${(24 - we) * HOUR}px"></div>`;
-      const now = day.date === d.now.date ? `<div class="tpi-now" style="top:${(d.now.minute / 60) * HOUR}px"></div>` : "";
+      const now = day.date === d.now.date ? `<div class="tcal-now" style="top:${(d.now.minute / 60) * HOUR}px"></div>` : "";
       const evs = day.timed.map((e) => {
         const top = (e.top / 60) * HOUR, ht = Math.max(16, ((e.bottom - e.top) / 60) * HOUR - 2);
         const w = 100 / (e.ncols || 1);
-        return `<div class="tpi-ev ${evCls(e)}" data-ev="${h(e.id)}" title="${h(e.title)}" style="top:${top}px;height:${ht}px;left:calc(${w * (e.col || 0)}% + 1px);width:calc(${w}% - 3px)">
-          <div class="tm">${h(e.time_label)}${stTag(e.my_status)}</div>${h(e.title)}</div>`;
+        const short = ht < 34;
+        const tip = `${e.time_label} ${e.title}${e.my_status ? " · " + (t("status")[e.my_status] || e.my_status) : ""}`;
+        return `<div class="tcal-ev ${short ? "short" : ""} ${evCls(e)}" data-ev="${h(e.id)}" title="${h(tip)}" style="top:${top}px;height:${ht}px;left:calc(${w * (e.col || 0)}% + 1px);width:calc(${w}% - 3px)">` +
+          (short ? `<span class="tm">${h(e.time_label)}</span>${h(e.title)}` : `<div class="tm">${h(e.time_label)}${stTag(e.my_status)}</div>${h(e.title)}`) + `</div>`;
       }).join("");
-      return `<div class="tpi-day ${day.weekend ? "weekend" : ""}" data-day="${h(day.date)}" style="height:${24 * HOUR}px">${lines}${off}${now}${evs}</div>`;
+      return `<div class="tcal-day ${day.weekend ? "weekend" : ""}" data-day="${h(day.date)}" style="height:${24 * HOUR}px">${lines}${off}${now}${evs}</div>`;
     }).join("");
-    return `<div class="tpi-wk"><div class="tpi-wk-head" style="grid-template-columns:${cols}">${head}</div>
-      <div class="tpi-wk-allday" style="grid-template-columns:${cols}">${allday}</div>
-      <div class="tpi-wk-body" style="grid-template-columns:${cols}">${gutters}${days}</div></div>`;
+    return `<div class="tcal-wk"><div class="tcal-wk-head" style="grid-template-columns:${cols}">${head}</div>
+      <div class="tcal-wk-allday" style="grid-template-columns:${cols}">${allday}</div>
+      <div class="tcal-wk-body" style="grid-template-columns:${cols}">${gutters}${days}</div></div>`;
   }
 
   function monthHtml(d) {
     const head = d.days.slice(0, 7).map((day) => `<div class="wd">${h(day.weekday)}</div>`).join("");
     const cells = d.days.map((day) => {
-      const shown = day.items.slice(0, 4).map((it) => `<span class="tpi-chip src-${h(it.source)} st-${h(it.my_status || "none")}" data-ev="${h(it.id)}" title="${h(it.title)}">${it.time_label ? h(it.time_label) + " " : ""}${h(it.title)}</span>`).join("");
+      const shown = day.items.slice(0, 4).map((it) => `<span class="tcal-chip ${evCls(it)}" data-ev="${h(it.id)}" title="${h(it.title)}">${it.time_label ? h(it.time_label) + " " : ""}${h(it.title)}</span>`).join("");
       const more = day.items.length > 4 ? `<div class="mr">${h(t("more"))} ${day.items.length - 4} ${h(t("items"))}</div>` : "";
       return `<div class="cell ${day.in_month ? "" : "out"} ${day.is_today ? "today" : ""} ${day.weekend ? "weekend" : ""}" data-cell="${h(day.date)}"><span class="dn">${h(day.day)}</span>${shown}${more}</div>`;
     }).join("");
-    return `<div class="tpi-mo">${head}${cells}</div>`;
+    return `<div class="tcal-mo">${head}${cells}</div>`;
   }
 
   function onGridClick(e) {
@@ -289,7 +293,7 @@
       else openEditor(null, cell.dataset.cell + "T09:00");
       return;
     }
-    const day = e.target.closest(".tpi-day");
+    const day = e.target.closest(".tcal-day");
     if (day) {
       const rect = day.getBoundingClientRect();
       const minute = Math.max(0, Math.min(1410, Math.floor(((e.clientY - rect.top) / HOUR) * 2) * 30));
@@ -324,11 +328,11 @@
     const rows = upcoming.filter((e) => { const k = e.id + e.instance; if (seen.has(k)) return false; seen.add(k); return true; });
     paneEl().innerHTML = `<h2 class="mh">${h(t("title"))}</h2>
       <p class="muted" style="margin:0">${h(d?.title || "")} · ${h(d?.tz || "")} · ${h(d?.count || 0)} ${h(t("items"))}</p>
-      <div class="tpi-sec">${h(t("yourRsvp"))}</div>
-      ${rows.map((e) => `<div class="tpi-li" data-ev="${h(e.id)}" style="cursor:pointer">
+      <div class="tcal-sec">${h(t("upcoming"))}</div>
+      ${rows.map((e) => `<div class="tcal-li" data-ev="${h(e.id)}" style="cursor:pointer">
         <span>${h(e.start.replace("T", " ").slice(5, 16))}</span><b>${h(e.title)}</b>${stTag(e.my_status)}
         <span class="r">${h(t("source")[e.source] || e.source)}</span></div>`).join("") || `<p class="muted">—</p>`}
-      <div class="tpi-note">${h(t("notSent"))}</div>`;
+      <div class="tcal-note">${h(t("notSent"))}</div>`;
     paneEl().onclick = (e) => { const r = e.target.closest("[data-ev]"); if (r) openEvent(r.dataset.ev); };
   }
 
@@ -341,25 +345,25 @@
 
   function renderEvent() {
     const d = view.detail, ev = d.event;
-    const people = (ev.attendees || []).map((a) => `<div class="tpi-li"><span>${h(a.name || a.email)}</span><span class="muted">${h(a.name ? a.email : "")}</span>${stTag(a.status)}</div>`).join("");
+    const people = (ev.attendees || []).map((a) => `<div class="tcal-li"><span>${h(a.name || a.email)}</span><span class="muted">${h(a.name ? a.email : "")}</span>${stTag(a.status)}</div>`).join("");
     const counts = ev.rsvp_counts || {};
     const canRsvp = ev.can_rsvp && ev.my_status !== "organizer";
-    const rsvp = canRsvp ? `<div class="tpi-sec">${h(t("yourRsvp"))}: ${stTag(ev.my_status || "needs-action")}</div>
-      <div class="tpi-rsvpbar">
+    const rsvp = canRsvp ? `<div class="tcal-sec">${h(t("yourRsvp"))}: ${stTag(ev.my_status || "needs-action")}</div>
+      <div class="tcal-rsvpbar">
         ${[["accepted", "accept"], ["tentative", "maybe"], ["declined", "decline"]].map(([st, k]) => `<button class="btn ${ev.my_status === st ? "on" : ""}" data-rsvp="${st}">${h(t(k))}</button>`).join("")}
         <label class="muted" style="font-size:11.5px"><input type="checkbox" id="tpiRsvpReply" /> ${h(t("rsvpReply"))}</label>
       </div>` : "";
-    const invites = (d.invites || []).map((i) => `<div class="tpi-li"><span>${h(i.method)}</span><span>${h(i.filename)}</span><span class="r">${h(i.created_at.slice(5, 16))}</span><a class="btn" href="${h(i.url)}" download="${h(i.filename)}">${h(t("download"))}</a></div>`).join("");
+    const invites = (d.invites || []).map((i) => `<div class="tcal-li"><span>${h(i.method)}</span><span>${h(i.filename)}</span><span class="r">${h(i.created_at.slice(5, 16))}</span><a class="btn" href="${h(i.url)}" download="${h(i.filename)}">${h(t("download"))}</a></div>`).join("");
     paneEl().innerHTML = `<button class="btn ghost" data-a="back">${h(t("back"))}</button>
       <h2 class="mh" style="margin-top:8px">${h(ev.title)} ${stTag(ev.my_status)}</h2>
       <p class="muted" style="margin:0">${h(t("source")[ev.source] || ev.source)} · ${h(ev.calendar_name)}${ev.location ? " · " + h(ev.location) : ""}${ev.repeat ? " · " + h(t("repeat")[ev.repeat] || ev.repeat) : ""}</p>
-      <div class="tpi-sec">${h(t("timesIn"))}</div>
-      ${(d.times || []).map((x) => `<div class="tpi-li"><b>${h(x.city)}</b><span class="muted">${h(x.offset)}</span><span class="r" style="color:var(--ink);font-size:12px">${h(x.text)}</span></div>`).join("")}
-      ${ev.organizer ? `<div class="tpi-sec">${h(t("organizer"))}</div><div class="tpi-li">${h(ev.organizer.name || ev.organizer.email)} <span class="muted">${h(ev.organizer.name ? ev.organizer.email : "")}</span></div>` : ""}
-      ${people ? `<div class="tpi-sec">${h(t("attendees"))} · ✓${h(counts.accepted || 0)} ?${h(counts.tentative || 0)} ✕${h(counts.declined || 0)} …${h(counts["needs-action"] || 0)}</div>${people}` : ""}
+      <div class="tcal-sec">${h(t("timesIn"))}</div>
+      ${(d.times || []).map((x) => `<div class="tcal-li"><b>${h(x.city)}</b><span class="muted">${h(x.offset)}</span><span class="r" style="color:var(--ink);font-size:12px">${h(x.text)}</span></div>`).join("")}
+      ${ev.organizer ? `<div class="tcal-sec">${h(t("organizer"))}</div><div class="tcal-li">${h(ev.organizer.name || ev.organizer.email)} <span class="muted">${h(ev.organizer.name ? ev.organizer.email : "")}</span></div>` : ""}
+      ${people ? `<div class="tcal-sec">${h(t("attendees"))} · ✓${h(counts.accepted || 0)} ?${h(counts.tentative || 0)} ✕${h(counts.declined || 0)} …${h(counts["needs-action"] || 0)}</div>${people}` : ""}
       ${rsvp}
-      ${ev.description ? `<div class="tpi-sec">${h(t("fDesc"))}</div><div style="white-space:pre-wrap;font-size:13px">${h(ev.description)}</div>` : ""}
-      ${invites ? `<div class="tpi-sec">${h(t("invite"))}</div>${invites}<div class="tpi-note">${h(t("notSent"))}</div>` : ""}
+      ${ev.description ? `<div class="tcal-sec">${h(t("fDesc"))}</div><div style="white-space:pre-wrap;font-size:13px">${h(ev.description)}</div>` : ""}
+      ${invites ? `<div class="tcal-sec">${h(t("invite"))}</div>${invites}<div class="tcal-note">${h(t("notSent"))}</div>` : ""}
       <div class="actionbar">
         ${ev.editable ? `<button class="btn primary" data-a="edit">${h(t("edit"))}</button><button class="btn ghost" data-a="del">${h(t("del"))}</button>` : `<span class="muted" style="font-size:12px">${h(t("readOnly"))}</span>`}
       </div>`;
@@ -410,7 +414,7 @@
     const res = view.result;
     paneEl().innerHTML = `<button class="btn ghost" data-a="back">${h(t("back"))}</button>
       <h2 class="mh" style="margin-top:8px">${h(f.id ? t("editTitle") : t("newTitle"))}</h2>
-      <div class="tpi-form" id="tpiForm">
+      <div class="tcal-form" id="tpiForm">
         <label>${h(t("fTitle"))}<input name="title" value="${h(f.title)}" /></label>
         <label class="inline"><input type="checkbox" name="all_day" ${f.all_day ? "checked" : ""} /> ${h(t("fAllDay"))}</label>
         <div class="two"><label>${h(t("fStart"))}<input name="start" type="${typ}" value="${h(val(f.start))}" /></label>
@@ -424,7 +428,7 @@
         <div class="acts"><button class="btn primary" data-a="save">${h(t("save"))}</button><button class="btn ghost" data-a="back">${h(t("cancel"))}</button></div>
       </div>
       ${res ? resultHtml(res) : ""}
-      <div class="tpi-note">${h(t("notSent"))}</div>`;
+      <div class="tcal-note">${h(t("notSent"))}</div>`;
     const formEl = el("tpiForm");
     formEl.querySelector("[name=all_day]").onchange = (e) => { view.form = { ...readForm(), all_day: e.target.checked }; renderEditor(); };
     paneEl().onclick = async (e) => {
@@ -457,12 +461,12 @@
 
   function resultHtml(r) {
     const inv = r.invite || r.reply;
-    return `${r.note ? `<div class="tpi-note">${h(r.note)}</div>` : ""}
-      ${(r.warnings || []).map((w) => `<div class="tpi-warn">⚠ ${h(w)}</div>`).join("")}
-      ${(r.conflicts || []).length ? `<div class="tpi-sec">${h(t("conflicts"))}</div>${r.conflicts.map((c) => `<div class="tpi-warn">⚠ ${h(c.who)} · ${h(c.title || t("privateBusy"))} · ${h(c.start.replace("T", " ").slice(5))} – ${h(c.end.slice(11))}</div>`).join("")}` : ""}
-      ${inv ? `<div class="tpi-sec">${h(t("invite"))} · ${h(inv.method)} · sent: false</div>
-        <div class="tpi-li"><span>${h(inv.filename)}</span><span class="muted">${h((inv.recipients || []).join(", "))}</span><a class="btn" href="${h(inv.url)}" download="${h(inv.filename)}">${h(t("download"))}</a></div>
-        <div class="tpi-pre">${h(inv.ics || "")}</div>` : ""}`;
+    return `${r.note ? `<div class="tcal-note">${h(r.note)}</div>` : ""}
+      ${(r.warnings || []).map((w) => `<div class="tcal-warn">⚠ ${h(w)}</div>`).join("")}
+      ${(r.conflicts || []).length ? `<div class="tcal-sec">${h(t("conflicts"))}</div>${r.conflicts.map((c) => `<div class="tcal-warn">⚠ ${h(c.who)} · ${h(c.title || t("privateBusy"))} · ${h(c.start.replace("T", " ").slice(5))} – ${h(c.end.slice(11))}</div>`).join("")}` : ""}
+      ${inv ? `<div class="tcal-sec">${h(t("invite"))} · ${h(inv.method)} · sent: false</div>
+        <div class="tcal-li"><span>${h(inv.filename)}</span><span class="muted">${h((inv.recipients || []).join(", "))}</span><a class="btn" href="${h(inv.url)}" download="${h(inv.filename)}">${h(t("download"))}</a></div>
+        <div class="tcal-pre">${h(inv.ics || "")}</div>` : ""}`;
   }
 
   function renderAi() {
@@ -470,20 +474,20 @@
     const p = pr?.proposal;
     paneEl().innerHTML = `<button class="btn ghost" data-a="back">${h(t("back"))}</button>
       <h2 class="mh" style="margin-top:8px">${h(t("aiTitle"))}</h2>
-      <div class="tpi-form"><textarea id="tpiAsk" placeholder="${h(t("aiHint"))}">${h(view.ask || "")}</textarea>
+      <div class="tcal-form"><textarea id="tpiAsk" placeholder="${h(t("aiHint"))}">${h(view.ask || "")}</textarea>
         <div class="acts"><button class="btn" data-a="parse">${h(t("aiPreview"))}</button>
         <button class="btn primary" data-a="book">${h(t("aiBookNow"))}</button></div></div>
-      ${pr ? `<div class="tpi-sec">${h(t("parsedBy"))}: ${h(pr.label)}</div>
-        ${pr.error ? `<div class="tpi-warn">⚠ ${h(pr.error)}</div>` : ""}
-        ${p.start ? `<div class="tpi-li"><b>${h(p.title)}</b><span class="r" style="color:var(--ink)">${h(p.start.replace("T", " "))} – ${h(p.end.slice(11))} · ${h(p.tz)}</span></div>
-          ${p.attendees.length ? `<div class="tpi-li">${h(t("attendees"))}: ${h(p.attendees.join(", "))}</div>` : ""}
-          ${p.location ? `<div class="tpi-li">${h(t("fLocation"))}: ${h(p.location)}</div>` : ""}
-          ${pr.slot ? `<div class="tpi-li muted">${h(t("aiSlot"))}: ${h(pr.slot.reason)}</div>` : ""}
-          ${(pr.conflicts || []).map((c) => `<div class="tpi-warn">⚠ ${h(c.who)} · ${h(c.title || t("privateBusy"))} · ${h(c.start.replace("T", " ").slice(5))}</div>`).join("")}
+      ${pr ? `<div class="tcal-sec">${h(t("parsedBy"))}: ${h(pr.label)}</div>
+        ${pr.error ? `<div class="tcal-warn">⚠ ${h(pr.error)}</div>` : ""}
+        ${p.start ? `<div class="tcal-li"><b>${h(p.title)}</b><span class="r" style="color:var(--ink)">${h(p.start.replace("T", " "))} – ${h(p.end.slice(11))} · ${h(p.tz)}</span></div>
+          ${p.attendees.length ? `<div class="tcal-li">${h(t("attendees"))}: ${h(p.attendees.join(", "))}</div>` : ""}
+          ${p.location ? `<div class="tcal-li">${h(t("fLocation"))}: ${h(p.location)}</div>` : ""}
+          ${pr.slot ? `<div class="tcal-li muted">${h(t("aiSlot"))}: ${h(pr.slot.reason)}</div>` : ""}
+          ${(pr.conflicts || []).map((c) => `<div class="tcal-warn">⚠ ${h(c.who)} · ${h(c.title || t("privateBusy"))} · ${h(c.start.replace("T", " ").slice(5))}</div>`).join("")}
           <div class="acts" style="margin-top:6px"><button class="btn ghost" data-a="form">${h(t("aiOpenForm"))}</button></div>`
-        : `<div class="tpi-warn">${h(t("aiNoStart"))}</div>`}` : ""}
+        : `<div class="tcal-warn">${h(t("aiNoStart"))}</div>`}` : ""}
       ${view.aiResult ? resultHtml(view.aiResult) : ""}
-      <div class="tpi-note">${h(t("notSent"))}</div>`;
+      <div class="tcal-note">${h(t("notSent"))}</div>`;
     paneEl().onclick = async (e) => {
       const a = e.target.closest("[data-a]")?.dataset.a;
       if (!a) return;
@@ -511,7 +515,7 @@
     const list = `<datalist id="tpiTzList">${[...new Set([...(s.timezones || []), ...(view.tzs.all || [])])].map((z) => `<option value="${h(z)}"></option>`).join("")}</datalist>`;
     paneEl().innerHTML = `<button class="btn ghost" data-a="back">${h(t("back"))}</button>
       <h2 class="mh" style="margin-top:8px">${h(t("zonesTitle"))}</h2>${list}
-      <div class="tpi-form">
+      <div class="tcal-form">
         <label>${h(t("primaryTz"))}<input id="tpiTz" list="tpiTzList" value="${h(s.tz)}" /></label>
         <label>${h(t("extraTz"))}</label>
         <div id="tpiZones">${s.extra_tzs.map((z) => zoneRow(z)).join("")}</div>
@@ -519,13 +523,13 @@
         <label>${h(t("weekStart"))}<select id="tpiWs"><option value="1" ${s.week_start === 1 ? "selected" : ""}>${h(t("monday"))}</option><option value="0" ${s.week_start === 0 ? "selected" : ""}>${h(t("sunday"))}</option></select></label>
         <div class="acts"><button class="btn primary" data-a="save">${h(t("save"))}</button></div>
       </div>
-      <div class="tpi-sec">${h(t("timesIn"))}</div>
-      ${(s.tz_labels || []).map((z) => `<div class="tpi-li"><b>${h(z.city)}</b><span class="r">${h(z.tz)} · ${h(z.offset)}</span></div>`).join("")}`;
+      <div class="tcal-sec">${h(t("timesIn"))}</div>
+      ${(s.tz_labels || []).map((z) => `<div class="tcal-li"><b>${h(z.city)}</b><span class="r">${h(z.tz)} · ${h(z.offset)}</span></div>`).join("")}`;
     paneEl().onclick = async (e) => {
       const a = e.target.closest("[data-a]")?.dataset.a;
       if (a === "back") showPane("home");
       else if (a === "addzone") { if (el("tpiZones").children.length < 3) el("tpiZones").insertAdjacentHTML("beforeend", zoneRow("")); }
-      else if (a === "rmzone") e.target.closest(".tpi-zone").remove();
+      else if (a === "rmzone") e.target.closest(".tcal-zone").remove();
       else if (a === "save") {
         const extra = [...el("tpiZones").querySelectorAll("input")].map((i) => i.value.trim()).filter(Boolean);
         try {
@@ -537,14 +541,14 @@
       }
     };
   }
-  const zoneRow = (z) => `<div class="tpi-zone tpi-form" style="margin:0"><input list="tpiTzList" value="${h(z)}" style="flex:1" /><button class="btn ghost" data-a="rmzone">${h(t("remove"))}</button></div>`;
+  const zoneRow = (z) => `<div class="tcal-zone tcal-form" style="margin:0"><input list="tpiTzList" value="${h(z)}" style="flex:1" /><button class="btn ghost" data-a="rmzone">${h(t("remove"))}</button></div>`;
 
   async function renderInvites() {
     const d = await getJSON("/api/cal/invites").catch(() => ({ invites: [] }));
     paneEl().innerHTML = `<button class="btn ghost" data-a="back">${h(t("back"))}</button>
       <h2 class="mh" style="margin-top:8px">${h(t("invites"))}</h2>
-      <div class="tpi-note">${h(t("notSent"))}</div>
-      ${d.invites.map((i) => `<div class="tpi-li"><span class="tpi-rsvp">${h(i.method)}</span><b data-ev="${h(i.event_id)}" style="cursor:pointer">${h(i.summary)}</b>
+      <div class="tcal-note">${h(t("notSent"))}</div>
+      ${d.invites.map((i) => `<div class="tcal-li"><span class="tcal-rsvp">${h(i.method)}</span><b data-ev="${h(i.event_id)}" style="cursor:pointer">${h(i.summary)}</b>
         <span class="muted">${h(i.recipients.join(", "))}</span><span class="r">${h(i.created_at.slice(5, 16))}</span>
         <a class="btn" href="${h(i.url)}" download="${h(i.filename)}">${h(t("download"))}</a></div>`).join("") || `<p class="muted">${h(t("noInvites"))}</p>`}`;
     paneEl().onclick = (e) => {
@@ -577,36 +581,36 @@
     paneEl().innerHTML = `<button class="btn ghost" data-a="back">${h(t("back"))}</button>
       <h2 class="mh" style="margin-top:8px">${h(t("fbTitle"))}</h2>
       <p class="muted" style="margin:0;font-size:12px">${h(fb.tz)} · ${h(ws)}:00–${h(we)}:00 · ${h(t("fbHint"))}</p>
-      <div class="tpi-form" style="flex-direction:row;align-items:end;gap:10px;flex-wrap:wrap">
+      <div class="tcal-form" style="flex-direction:row;align-items:end;gap:10px;flex-wrap:wrap">
         <label>${h(t("minutes"))}<select id="tpiFbMin">${[15, 30, 45, 60, 90, 120].map((m) => `<option ${m === fbOpts.minutes ? "selected" : ""}>${m}</option>`).join("")}</select></label>
         <label class="inline"><input type="checkbox" id="tpiFbWe" ${fbOpts.weekends ? "checked" : ""} /> ${h(t("weekends"))}</label>
       </div>
-      <div class="tpi-fb" style="grid-template-columns:${cols}">${head}${rows}${freeRow}</div>
-      <div class="tpi-sec">${h(t("freeSlots"))}</div>
-      ${fb.free_slots.slice(0, 12).map((s, i) => `<div class="tpi-li"><span>${h(s.date.slice(5))} ${h(s.start.slice(11))}–${h(s.end.slice(11))}</span><span class="muted">${h(Math.round(s.minutes / 6) / 10)}${h(t("hours"))}</span><button class="btn r" style="margin-left:auto" data-slot="${i}">${h(t("useSlot"))}</button></div>`).join("") || `<p class="muted">${h(t("noSlots"))}</p>`}
-      <div class="tpi-sec">${h(t("feeds"))}</div>
-      ${feeds.map((f) => `<div class="tpi-li"><input type="checkbox" data-feed="${h(f.id)}" ${fbOpts.off.includes(f.id) ? "" : "checked"} />
+      <div class="tcal-fb" style="grid-template-columns:${cols}">${head}${rows}${freeRow}</div>
+      <div class="tcal-sec">${h(t("freeSlots"))}</div>
+      ${fb.free_slots.slice(0, 12).map((s, i) => `<div class="tcal-li"><span>${h(s.date.slice(5))} ${h(s.start.slice(11))}–${h(s.end.slice(11))}</span><span class="muted">${h(Math.round(s.minutes / 6) / 10)}${h(t("hours"))}</span><button class="btn r" style="margin-left:auto" data-slot="${i}">${h(t("useSlot"))}</button></div>`).join("") || `<p class="muted">${h(t("noSlots"))}</p>`}
+      <div class="tcal-sec">${h(t("feeds"))}</div>
+      ${feeds.map((f) => `<div class="tcal-li"><input type="checkbox" data-feed="${h(f.id)}" ${fbOpts.off.includes(f.id) ? "" : "checked"} />
         <b>${h(f.name)}</b><span class="muted">${h(f.email)}</span><span class="muted">${h(f.kind === "url" ? f.url : f.filename)}</span>
         <span class="r">${h(f.events)} ${h(t("events"))} · ${h(f.freebusy)} ${h(t("fbBlocks"))}</span>
-        ${f.error ? `<span class="tpi-warn">⚠ ${h(f.error)}</span>` : ""}
+        ${f.error ? `<span class="tcal-warn">⚠ ${h(f.error)}</span>` : ""}
         ${f.kind === "url" ? `<button class="btn" data-a="refresh" data-id="${h(f.id)}">${h(t("refresh"))}</button>` : ""}
         <button class="btn ghost" data-a="rmfeed" data-id="${h(f.id)}">${h(t("remove"))}</button></div>`).join("") || `<p class="muted">${h(t("noFeeds"))}</p>`}
       <div class="acts" style="margin:8px 0"><button class="btn" data-a="demo">${h(t("demoFeeds"))}</button></div>
-      <div class="tpi-sec">${h(t("importUrl"))}</div>
-      <div class="tpi-form" id="tpiFeedUrl">
+      <div class="tcal-sec">${h(t("importUrl"))}</div>
+      <div class="tcal-form" id="tpiFeedUrl">
         <input name="url" placeholder="https://calendar.example.com/pat.ics" />
         <div class="two"><input name="name" placeholder="${h(t("feedName"))}" /><input name="email" placeholder="${h(t("feedEmail"))}" /></div>
         <label class="inline"><input type="checkbox" name="allow_private" /> ${h(t("allowPrivate"))}</label>
         <div class="acts"><button class="btn primary" data-a="addurl">${h(t("add"))}</button></div>
       </div>
-      <div class="tpi-sec">${h(t("importFile"))}</div>
-      <div class="tpi-form" id="tpiFeedFile">
+      <div class="tcal-sec">${h(t("importFile"))}</div>
+      <div class="tcal-form" id="tpiFeedFile">
         <input name="file" type="file" accept=".ics,text/calendar" />
         <div class="two"><input name="name" placeholder="${h(t("feedName"))}" /><input name="email" placeholder="${h(t("feedEmail"))}" /></div>
         <div class="acts"><button class="btn primary" data-a="addfile">${h(t("add"))}</button></div>
       </div>
-      <div class="tpi-sec">${h(t("importMine"))}</div>
-      <div class="tpi-form" id="tpiMine"><input name="file" type="file" accept=".ics,text/calendar" />
+      <div class="tcal-sec">${h(t("importMine"))}</div>
+      <div class="tcal-form" id="tpiMine"><input name="file" type="file" accept=".ics,text/calendar" />
         <div class="acts"><button class="btn" data-a="mine">${h(t("add"))}</button></div></div>`;
     el("tpiFbMin").onchange = (e) => { fbOpts.minutes = parseInt(e.target.value, 10); renderFreebusy(); };
     el("tpiFbWe").onchange = (e) => { fbOpts.weekends = e.target.checked; renderFreebusy(); };
@@ -664,7 +668,7 @@
   const coreSetView = window.setView;
   if (typeof coreSetView === "function") {
     window.setView = (v, ...rest) => {
-      if (v !== "calendar") document.getElementById("app")?.classList.remove("tpi-cal-wide");
+      if (v !== "calendar") document.getElementById("app")?.classList.remove("tcal-cal-wide");
       return coreSetView(v, ...rest);
     };
   }
