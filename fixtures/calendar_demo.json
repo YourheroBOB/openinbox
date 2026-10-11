@@ -1,0 +1,59 @@
+{
+  "comment": "Fictional calendar demo data for the calendar feature. Names and example.com addresses are made up.",
+  "version": 1,
+  "sync_meta": {
+    "demo-cal-1": {
+      "organizer": {"email": "samira@northwind.example.com", "name": "Samira Ortiz"},
+      "attendees": [
+        {"email": "you@example.com", "name": "Alex Chen", "status": "ACCEPTED"},
+        {"email": "samira@northwind.example.com", "name": "Samira Ortiz", "status": "ACCEPTED"},
+        {"email": "ir@northwind.example.com", "name": "Northwind IR", "status": "TENTATIVE"}
+      ],
+      "location": "Video call"
+    },
+    "demo-cal-2": {
+      "organizer": {"email": "maya@studio.example.com", "name": "Maya Singh"},
+      "attendees": [
+        {"email": "you@example.com", "name": "Alex Chen", "status": "NEEDS-ACTION"},
+        {"email": "maya@studio.example.com", "name": "Maya Singh", "status": "ACCEPTED"}
+      ],
+      "location": "Studio, room 2"
+    }
+  },
+  "events": [
+    {
+      "uid": "demo-tpi-cal-planning@example.com",
+      "title": "Weekly planning",
+      "start": "2026-09-14T09:30", "end": "2026-09-14T10:00", "tz": "Asia/Taipei",
+      "rrule": "FREQ=WEEKLY;BYDAY=MO"
+    },
+    {
+      "uid": "demo-tpi-cal-hiring@example.com",
+      "title": "Hiring sync: contract designer",
+      "start": "2026-09-17T11:00", "end": "2026-09-17T11:30", "tz": "Asia/Taipei",
+      "attendees": [{"email": "lee@example.com", "name": "Lee Sample", "status": "ACCEPTED"}]
+    },
+    {
+      "uid": "demo-tpi-cal-office-hours@example.com",
+      "title": "Northwind partner office hours (New York)",
+      "start": "2026-09-16T20:00", "end": "2026-09-16T21:00", "tz": "America/New_York",
+      "organizer": {"email": "samira@northwind.example.com", "name": "Samira Ortiz"},
+      "attendees": [
+        {"email": "you@example.com", "name": "Alex Chen", "status": "TENTATIVE"},
+        {"email": "samira@northwind.example.com", "name": "Samira Ortiz", "status": "ACCEPTED"}
+      ],
+      "location": "Video call"
+    },
+    {
+      "uid": "demo-tpi-cal-renewal@example.com",
+      "title": "Byte Cloud renewal walkthrough",
+      "start": "2026-09-18T14:00", "end": "2026-09-18T14:30", "tz": "Asia/Taipei",
+      "organizer": {"email": "accounts@bytecloud.example.com", "name": "Byte Cloud"},
+      "attendees": [{"email": "you@example.com", "name": "Alex Chen", "status": "DECLINED"}]
+    }
+  ],
+  "colleagues": [
+    {"name": "Pat Example", "email": "pat@example.com", "file": "ics/pat-example.ics"},
+    {"name": "Lee Sample", "email": "lee@example.com", "file": "ics/lee-example.ics"}
+  ]
+}
