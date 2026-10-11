@@ -2,11 +2,36 @@
 from __future__ import annotations
 
 import json
+import os
+import shutil
+import sqlite3
+import subprocess
+import sys
+import tempfile
 import unittest
+from pathlib import Path
 
 import _tpi_followup_util as fu
 import _tpi_server as srv
 import yhbmail
+from features import rules
+
+# Hand-written rules.json with typos: "frm" wipes out the only condition of "archive-promos"
+# (it used to match every mail), "lable" leaves "tag-receipts" with an empty label, and
+# "ack-northwind" keeps one good condition next to a misspelled one.
+TYPO_RULES = {"rules": [
+    {"id": "archive-promos", "conditions": [{"frm": "from", "op": "contains", "value": "promo"}],
+     "actions": [{"type": "archive"}, {"type": "mark_read"}]},
+    {"id": "tag-receipts", "conditions": [{"field": "subject", "op": "contains", "value": "receipt"}],
+     "actions": [{"type": "label", "lable": "Receipts"}]},
+    {"id": "ack-northwind", "match": "any",
+     "conditions": [{"field": "from", "op": "contains", "value": "northwind"},
+                    {"field": "subjcet", "op": "contains", "value": "scope"}],
+     "actions": [{"type": "draft_reply", "template": "Hi {first_name}"}]},
+    {"id": "label-changelogs", "conditions": [{"field": "subject", "op": "contains", "value": "changelog"}],
+     "actions": [{"type": "label", "label": "Changelog"}]},
+]}
+SCRIPT = srv.REPO / "scripts" / "overnight.py"
 
 DRAFT_RULE = {
     "id": "scope-ack", "name": "Ack the scope question", "match": "all",
@@ -193,6 +218,76 @@ class RulesTest(unittest.TestCase):
         self.assertEqual((d["source"], d["rules"]), ("file", []))
         self.assertIn("rules.json", d["errors"][0]["message"])
         self.assertEqual(run({})["counts"]["planned"], 0)
+        status, out = srv.post("/api/rules/run", {"now": fu.NOW, "dry_run": False})
+        self.assertEqual(status, 400, out)
+
+    def test_a_rule_with_any_error_is_dropped_whole(self):
+        clean, errors = rules.validate(TYPO_RULES)
+        self.assertEqual([r["id"] for r in clean["rules"]], ["label-changelogs"])
+        self.assertEqual(sorted({e["id"] for e in errors}), ["ack-northwind", "archive-promos", "tag-receipts"])
+        status, out = srv.post("/api/rules/validate", {"doc": TYPO_RULES})
+        self.assertEqual((status, out["ok"]), (200, False))
+        self.assertEqual([r["id"] for r in out["doc"]["rules"]], ["label-changelogs"])
+
+    def test_empty_conditions_never_match(self):
+        rule = {"id": "x", "match": "all", "conditions": [], "actions": [{"type": "archive"}]}
+        row = {"id": "m", "subject": "anything"}
+        self.assertFalse(rules.matches(row, rule, {"marks": {}, "now_ts": 0, "replied": set()}))
+        self.assertFalse(rules.matches(row, {**rule, "match": "any"}, {"marks": {}, "now_ts": 0, "replied": set()}))
+
+    def test_typo_in_rules_file_applies_nothing(self):
+        (srv.ROOT / "rules.json").write_text(json.dumps(TYPO_RULES, indent=2))
+        all_ids = [e["id"] for e in srv.get("/api/inbox?limit=200")[1]["emails"]]
+        unread = {e["id"]: e["unread"] for e in srv.get("/api/inbox?limit=200")[1]["emails"]}
+        drafts = draft_count()
+        d = srv.get("/api/rules")[1]
+        self.assertEqual([r["id"] for r in d["rules"]], ["label-changelogs"])
+        self.assertTrue(d["errors"])
+
+        status, out = srv.post("/api/rules/run", {"now": fu.NOW, "dry_run": False})
+        self.assertEqual(status, 400, out)
+        self.assertFalse(out["ok"])
+        self.assertIn("rules.json", out["error"])
+        self.assertEqual(sorted({e["id"] for e in out["errors"]}), ["ack-northwind", "archive-promos", "tag-receipts"])
+        zh = srv.post("/api/rules/run", {"now": fu.NOW, "dry_run": False, "lang": "zh-Hant"})
+        self.assertEqual(zh[0], 400)
+        self.assertIn("不套用任何規則", zh[1]["error"])
+
+        self.assertEqual(srv.post("/api/rules/marks", {"ids": all_ids})[1]["marks"],
+                         {i: {"labels": [], "archived": False} for i in all_ids})
+        self.assertEqual({e["id"]: e["unread"] for e in srv.get("/api/inbox?limit=200")[1]["emails"]}, unread)
+        self.assertEqual(draft_count(), drafts)
+        self.assertEqual(srv.get("/api/rules/runs")[1]["runs"], [])
+        self.assertEqual(srv.get("/api/triage/tasks")[1]["tasks"], [])
+
+        preview = run({})
+        self.assertEqual(preview["per_rule"], {"label-changelogs": 1})
+        self.assertEqual(preview["counts"]["applied"], 0)
+        self.assertTrue(preview["errors"])
+
+    def test_overnight_apply_rules_with_typo_file_applies_nothing(self):
+        root = Path(tempfile.mkdtemp(prefix="tpi-night-typo-"))
+        self.addCleanup(shutil.rmtree, root, True)
+        (root / "rules.json").write_text(json.dumps(TYPO_RULES, indent=2))
+        env = {k: v for k, v in os.environ.items() if k != "OPENINBOX_ROOT"}
+        cmd = [sys.executable, str(SCRIPT), "--root", str(root), "--no-sync", "--lang", "en", "--now", fu.NOW,
+               "--apply-rules", "--json"]
+        r = subprocess.run(cmd, capture_output=True, text=True, timeout=120, env=env)
+        self.assertEqual(r.returncode, 1, r.stderr)
+        out = json.loads(r.stdout)
+        self.assertFalse(out["ok"])
+        s = out["summary"]
+        self.assertEqual((s["rules_dry_run"], s["rules_applied"], s["rules_matched"], s["sent"]), (False, 0, 0, 0))
+        text = " ".join(out["errors"])
+        self.assertIn("rules.json has errors", text)
+        for typo in ("unknown field", "label: 1 to 40"):
+            self.assertIn(typo, text)
+        con = sqlite3.connect(root / "data" / "openinbox.db")
+        try:
+            for table in ("rule_marks", "rule_applied", "rule_runs"):
+                self.assertEqual(con.execute(f"SELECT COUNT(*) FROM {table}").fetchone()[0], 0, table)
+        finally:
+            con.close()
 
 
 if __name__ == "__main__":

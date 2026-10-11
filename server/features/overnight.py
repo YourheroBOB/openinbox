@@ -317,7 +317,8 @@ def _run(lang, sync, apply_rules, drafts, max_drafts, now, days, write, source, 
     ru, status = rules.run(dry_run=not apply_rules, lang=lang, now=now_ts, source="overnight")
     if status != 200:
         errors.append(f"rules: {ru.get('error')}")
-        ru = {"dry_run": not apply_rules, "matched": [], "counts": {"planned": 0, "applied": 0}, "emails_matched": 0}
+        ru = {"dry_run": not apply_rules, "matched": [], "counts": {"planned": 0, "applied": 0}, "emails_matched": 0,
+              "errors": ru.get("errors") or []}
     errors += [f"rules: {e['message']}" for e in ru.get("errors") or []]
     errors += [f"rules: {a['label']} · {m['subject']}: {a['detail'].get('reason')}"
                for m in ru["matched"] for a in m["actions"] if a["status"] == "error"]

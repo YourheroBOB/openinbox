@@ -2,7 +2,7 @@
 
 goal: 追蹤與自動化：寄出後 N 天無回覆的 thread 浮上來、JSON 自動化規則（符合條件自動標籤／歸檔／起草本機草稿，先 dry-run）、夜班 agent 腳本 scripts/overnight.py（一次跑完分流＋預備草稿＋早晨交接 brief）。對應 F29 F30 F31。
 status: done
-next: 交 orchestrator 合併；可選後續：規則加「寄件者網域」快捷欄位、夜班 brief 推到 UI 首頁卡片。
+next: 交 orchestrator 進 PR #20 第 2 輪 AI 審查／合併；可選後續：規則加「寄件者網域」快捷欄位、夜班 brief 推到 UI 首頁卡片。
 
 ## 功能
 
@@ -17,3 +17,4 @@ next: 交 orchestrator 合併；可選後續：規則加「寄件者網域」快
 - 2026-10-11 22:47 第一輪：寫完 followup／rules／overnight／UI 與 4 支測試（工作樹後來遺失，未 commit）。
 - 2026-10-11 23:20 從上一輪紀錄復原全部檔案；修測試順序相依（`_tpi_followup_util.Baseline` 先暫存其他套件留下的草稿，避免 m1 已有回覆草稿導致 rules 測試失敗）；驗證：`python3 -m unittest discover -s tests` 389 tests OK、`scripts/smoke.sh` OK、`scripts/overnight.py --root /tmp/fu --no-sync` 繁中／英文 brief 產出且第二次不重複起草、`node --check ui/modules/followup.js` OK。
 - 2026-10-11 23:22 review pass：實測三功能可用。修一個小 bug：`scripts/overnight.py --root <空目錄>` 因 demo fixture 路徑跟著 root 走而崩潰（FileNotFoundError），改為 root 無 fixture 時退回 repo `fixtures/`，並補 `test_script_on_an_empty_root_uses_repo_fixtures`（修前失敗、修後通過）。驗證：`python3 -m unittest discover -s tests` 390 tests OK、`scripts/smoke.sh` OK；空 root 跑夜班繁中／英文 brief、`--apply-rules` 套用 6 個動作且再跑為 0；起伺服器以 HTTP 實測 `/api/followup`（N 天門檻改 7 天即時生效、done、nudge 本機草稿）、`/api/rules/run` 預設 dry-run、`/api/rules/validate` 擋未知動作 `send`、5 支 POST 跨來源皆 403；禁用字／部署檔／workflow 字樣掃描乾淨，`server/app.py`、`ui/index.html`、`STATE.md` 未改。
+- 2026-10-11 23:50 PR #20 審查第 1 輪修正：`rules.run()` 在 dry_run=false 且 rules.json 有錯時回 400、一條都不套用（夜班照樣出 brief，錯誤列進 errors、套用 0）；`validate()` 規則只要有任何 id／條件／動作錯誤就整條排除；`matches()` 條件為空一律 False；補 4 支測試（手寫欄位打錯的 rules.json 跑 `/api/rules/run` dry_run=false 與 `scripts/overnight.py --apply-rules` 皆 0 動作、標記／已讀／草稿／任務／rule_runs 都沒變）。驗證：還原修正時新測試 5 項失敗、修正後通過；`python3 -m unittest discover -s tests` 394 tests OK、`scripts/smoke.sh` OK。

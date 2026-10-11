@@ -163,6 +163,7 @@ def validate(doc, lang: str = "en") -> tuple[dict, list[dict]]:
             err(i, "", "a rule must be an object", "每條規則要是物件")
             continue
         rid = str(r.get("id") or "")
+        n_errors = len(errors)
         if not ID_RE.match(rid):
             err(i, rid, "id: lowercase letters, digits, - or _ (max 40)", "id 只能用小寫英數、- 或 _（最多 40 字）")
         elif rid in seen:
@@ -254,6 +255,9 @@ def validate(doc, lang: str = "en") -> tuple[dict, list[dict]]:
                 if a.get("note"):
                     out["note"] = str(a["note"])[:300]
             clean_acts.append(out)
+        if len(errors) > n_errors:
+            # a half-valid rule can match far more mail than its author meant
+            continue
         clean.append({
             "id": rid, "name": str(r.get("name") or rid)[:80], "description": str(r.get("description") or "")[:300],
             "enabled": r.get("enabled", True) is not False, "match": match if match in ("all", "any") else "all",
@@ -382,6 +386,8 @@ def test_condition(row: dict, cond: dict, ctx: dict) -> bool:
 
 
 def matches(row: dict, rule: dict, ctx: dict) -> bool:
+    if not rule["conditions"]:
+        return False
     results = (test_condition(row, c, ctx) for c in rule["conditions"])
     return all(results) if rule["match"] == "all" else any(results)
 
@@ -512,6 +518,10 @@ def run(doc=None, dry_run: bool = True, rule_ids=None, ids=None, limit: int = 50
     if doc is None:
         loaded = load_rules(lang)
         rules, errors = loaded["rules"], loaded["errors"]
+        if errors and not dry_run:
+            return {"ok": False, "dry_run": False, "errors": errors,
+                    "error": f"{loaded['path']} 有錯誤，修好之前不套用任何規則" if zh
+                    else f"{loaded['path']} has errors; no rule is applied until they are fixed"}, 400
     else:
         clean, errors = validate(doc, lang)
         if errors:
