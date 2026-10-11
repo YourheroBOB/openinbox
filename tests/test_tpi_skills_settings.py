@@ -91,6 +91,19 @@ class SettingsTest(unittest.TestCase):
         _, free = srv.post("/api/v1/agent/run", {"ask": "hello", "lang": "en"})
         self.assertIsNone(free["error"])
 
+    def test_core_agent_route_honours_every_switch(self):
+        for meta in skills.SKILLS:
+            with self.subTest(skill=meta["slug"], prompt=meta["prompt"]):
+                self.assertTrue((srv.ROOT / "skills" / f"{meta['prompt']}.md").exists())
+                srv.post("/api/skills/settings", {"enabled": {s: s != meta["slug"] for s in ALL}})
+                _, off = srv.post("/api/v1/agent/run", {"skill": meta["prompt"], "lang": "en"})
+                self.assertEqual(off["error"], "skill_disabled")
+                self.assertTrue(off["disabled"])
+                self.assertEqual(off["skill"], meta["prompt"])
+                srv.post("/api/skills/settings", {"slug": meta["slug"], "enabled": True})
+                _, on = srv.post("/api/v1/agent/run", {"skill": meta["prompt"], "lang": "en"})
+                self.assertNotEqual(on.get("error"), "skill_disabled")
+
     def test_slide_of_disabled_skill_refused(self):
         srv.post("/api/skills/settings", {"slug": "morning-brief", "enabled": False})
         status, out = srv.post("/api/skills/run", {"skill": "slide", "from_skill": "morning-brief"})
