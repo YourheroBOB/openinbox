@@ -1,0 +1,141 @@
+{
+  "version": 1,
+  "comment": "Fictional demo rules for the demo inbox. Shown until you save your own rules.json; every run is a dry run unless you apply it.",
+  "rules": [
+    {
+      "id": "receipts",
+      "name": "Receipts: label and mark read",
+      "description": "Receipts and invoices get a local label and are marked read.",
+      "enabled": true,
+      "match": "any",
+      "conditions": [
+        {
+          "field": "subject",
+          "op": "contains",
+          "value": "receipt"
+        },
+        {
+          "field": "text",
+          "op": "regex",
+          "value": "invoice|帳單|發票|收據"
+        }
+      ],
+      "actions": [
+        {
+          "type": "label",
+          "label": "Receipts"
+        },
+        {
+          "type": "mark_read"
+        }
+      ]
+    },
+    {
+      "id": "changelogs",
+      "name": "Changelogs: label and archive",
+      "enabled": true,
+      "match": "all",
+      "conditions": [
+        {
+          "field": "from",
+          "op": "contains",
+          "value": "changelog"
+        }
+      ],
+      "actions": [
+        {
+          "type": "label",
+          "label": "Changelog"
+        },
+        {
+          "type": "archive"
+        }
+      ],
+      "stop": true
+    },
+    {
+      "id": "promotions",
+      "name": "Promotions: label and archive",
+      "enabled": true,
+      "match": "any",
+      "conditions": [
+        {
+          "field": "label",
+          "op": "contains",
+          "value": "CATEGORY_PROMOTIONS"
+        },
+        {
+          "field": "category",
+          "op": "equals",
+          "value": "other"
+        }
+      ],
+      "actions": [
+        {
+          "type": "label",
+          "label": "Promotions"
+        },
+        {
+          "type": "archive"
+        }
+      ],
+      "stop": true
+    },
+    {
+      "id": "system-asks",
+      "name": "Automated asks: add a review task",
+      "enabled": true,
+      "match": "all",
+      "conditions": [
+        {
+          "field": "lane",
+          "op": "equals",
+          "value": "needs_you"
+        },
+        {
+          "field": "from",
+          "op": "contains",
+          "value": "noreply"
+        }
+      ],
+      "actions": [
+        {
+          "type": "task",
+          "action": "review",
+          "note": "Added by rule system-asks"
+        }
+      ]
+    },
+    {
+      "id": "holding-reply",
+      "name": "Unanswered asks: holding reply draft",
+      "description": "A short local draft for people waiting on you; never sent.",
+      "enabled": true,
+      "match": "all",
+      "conditions": [
+        {
+          "field": "lane",
+          "op": "equals",
+          "value": "needs_you"
+        },
+        {
+          "field": "replied",
+          "op": "is",
+          "value": false
+        },
+        {
+          "field": "from",
+          "op": "not_contains",
+          "value": "noreply"
+        }
+      ],
+      "actions": [
+        {
+          "type": "draft_reply",
+          "template": "Hi {first_name},\n\nThanks for your note on “{subject}”. I'm on it and will get back to you by {tbd}.\n\nBest,",
+          "template_zh": "{first_name} 你好：\n\n收到「{subject}」，我正在處理，會在 {tbd} 前回覆你。\n\n謝謝！"
+        }
+      ]
+    }
+  ]
+}
