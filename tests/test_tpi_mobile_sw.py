@@ -12,6 +12,7 @@ import subprocess
 import tempfile
 import unittest
 from pathlib import Path
+from unittest import mock
 
 import _tpi_server as srv
 
@@ -145,6 +146,14 @@ class VersionTest(unittest.TestCase):
             (ui / "pwa" / "offline.html").write_text("<p>changed</p>")
             self.assertNotEqual(changed, mobile.asset_version(ui))
         self.assertEqual(mobile.asset_version(), mobile.asset_version(srv.REPO / "ui"))
+
+    def test_version_tracks_manifest_and_icons(self):
+        before = mobile.asset_version()
+        with mock.patch.dict(mobile.TEXT["en"], description="changed"):
+            self.assertNotEqual(before, mobile.asset_version())
+        with mock.patch.object(mobile, "STROKE", mobile.STROKE * 2):
+            self.assertNotEqual(before, mobile.asset_version())
+        self.assertEqual(before, mobile.asset_version())
 
 
 @unittest.skipUnless(shutil.which("node"), "node not installed")

@@ -74,7 +74,8 @@ def asset_version(ui: Path = UI) -> str:
     for p in files:
         if p.is_file():
             h.update(p.relative_to(ui).as_posix().encode() + b"\0" + p.read_bytes() + b"\0")
-    h.update(json.dumps([PRECACHE, sorted(PNG_ICONS)]).encode())
+    h.update(json.dumps([PRECACHE, PNG_ICONS, APPLE_ICON, FAVICON, ENV_BOX, ENV_TIP, ACCENT, ACCENT_DARK, INK,
+                         manifest("zh"), manifest("en"), icon_svg()]).encode())
     return h.hexdigest()[:12]
 
 

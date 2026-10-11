@@ -23,3 +23,7 @@ next: 等 review／合併；之後若要擴充：推播通知（需 HTTPS＋使�
   Node vm 內實跑 sw.js（假 caches/fetch）證明 /api/*、POST、跨來源、/mailops/print 皆不攔截且快取只含靜態路徑；
   headless Chrome CDP 390×844：Page.getInstallabilityErrors 為空、SW 控制頁面、CacheStorage 無 /api/ 與 /、抽屜／信件詳情／返回鍵／Copilot／撰寫器全螢幕／語言切換／1280 寬桌面版不變，皆無頁面例外；
   另起一支拋棄式伺服器後砍掉：開啟中顯示離線橫幅、重新導覽由 SW 回離線頁；截圖人工檢視版面；硬規則 grep（寄信字樣、非 example 信箱、部署檔、workflow 字樣）皆無。
+- 2026-10-12 02:30 驗收審查：review pass。重跑 python3 -m unittest discover -s tests（491→492 OK，mobile 43 個無 skip）、scripts/smoke.sh OK；
+  以臨時 fixtures 根目錄另起真正的 server/app.py 程序，curl 檢查 manifest（中／英）、sw.js 版本與預快取注入、offline.html、各圖示 PNG 尺寸、路徑穿越 404、/api/mobile/info、/api/ui-modules 含 mobile.js；
+  headless Chrome 390×844 實跑：可安裝（installabilityErrors 空）、SW 控制頁面、CacheStorage 只有靜態檔（無 /、無 /api/）、分頁列／抽屜／全螢幕信件與 Copilot／撰寫器／返回鍵／中英切換／1280 寬桌面版不變、無例外；砍伺服器後離線橫幅與離線頁正常；截圖人工檢視。
+  順手修小瑕疵：asset_version 原本只雜湊 ui/ 檔案，manifest 為 cache-first，只改 mobile.py 的 manifest 文字或圖示參數時已安裝 App 會卡舊版；改為一併雜湊兩語 manifest、SVG 與圖示參數，補 test_version_tracks_manifest_and_icons。硬規則 grep 皆無違規。
