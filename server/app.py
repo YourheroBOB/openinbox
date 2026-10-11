@@ -17,6 +17,7 @@ os.environ.setdefault("OPENINBOX_ROOT", str(ROOT))
 sys.path.insert(0, str(HERE))
 
 import agent_bridge  # noqa: E402
+import features  # noqa: E402
 import persona  # noqa: E402
 import second_brain  # noqa: E402
 import yhbmail  # noqa: E402
@@ -200,6 +201,9 @@ class Handler(BaseHTTPRequestHandler):
                 return json_ok(self, {"error": "missing id"}, 400)
             return json_ok(self, {"ok": True, "deleted": draft_id, "changed": yhbmail.delete_draft(draft_id)})
         return json_ok(self, {"error": "not found"}, 404)
+
+
+Handler = features.mount(Handler)
 
 
 def main() -> None:

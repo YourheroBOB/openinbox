@@ -45,7 +45,7 @@ Demo mode is the default. When you want live boxes, edit `accounts.json`:
 {
   "mode": "live",
   "accounts": [
-    { "email": "you@gmail.com", "platform": "gmail", "driver": "gog", "label": "Work" }
+    { "email": "you@example.com", "platform": "gmail", "driver": "gog", "label": "Work" }
   ]
 }
 ```
@@ -55,6 +55,49 @@ Demo mode is the default. When you want live boxes, edit `accounts.json`:
 
 Then press **Refresh** in the dashboard.
 
+To wipe what this machine has cached (mail, events, Copilot history, derived cards), use **Clear local cache** in the sidebar or `POST /api/cache/clear` (`{"reseed": true}` reloads the demo mail). Drafts and the note cards you wrote stay. `GET /api/cache` shows what is cached.
+
+## Run on a cloud Linux host
+
+The server only listens on `127.0.0.1:8770`, so on a remote box you reach it through an SSH tunnel. No public port, no reverse proxy, no deploy config.
+
+On the host:
+
+```bash
+git clone https://github.com/YourheroBOB/openinbox.git && cd openinbox
+./install.sh
+OPENINBOX_NO_BROWSER=1 ./run.sh        # keep it alive with tmux / screen if you like
+```
+
+On your laptop:
+
+```bash
+ssh -N -L 8770:127.0.0.1:8770 user@your-host.example.com
+```
+
+Then open [http://127.0.0.1:8770/](http://127.0.0.1:8770/) locally. If 8770 is taken on the laptop, use `-L 8771:127.0.0.1:8770` and open port 8771. Keep the host firewall closed for 8770; the tunnel is the only way in. `accounts.json`, `agent.json`, `data/` and `vault/` live on the host, so treat its disk like your inbox.
+
+## Add a feature
+
+Drop `server/features/<name>.py`; its routes register themselves, `server/app.py` does not change:
+
+```python
+from features import get, post
+
+@get("/api/hello")
+def hello(req):            # req.query, req.body, req.lang_zh()
+    return {"hello": "world"}
+```
+
+UI goes in `ui/modules/<name>.js`; `index.html` loads every module listed by `GET /api/ui-modules`. Ship each UI string in both `zh` and `en`. `GET /api/features` lists loaded features, routes and import errors.
+
+## Tests
+
+```bash
+python3 -m unittest discover -s tests   # stdlib unittest, throwaway data dir
+scripts/smoke.sh                        # the CI smoke workflow, run locally on Linux
+```
+
 ## Layout
 
 ```
@@ -63,8 +106,12 @@ server/persona.py      know you better
 server/second_brain.py vault cards
 server/agent_bridge.py BYO agent + tools
 server/app.py          HTTP + dashboard
+server/features/       plug-in routes (cache, plugins, …)
 ui/index.html          visualization panel (zh-Hant / en)
+ui/modules/            plug-in UI scripts
 skills/                morning-brief, catch-me-up, …
+tests/                 unittest suite
+scripts/smoke.sh       local smoke run
 vault/                 persona + cards (local, gitignored)
 ```
 
