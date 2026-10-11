@@ -62,6 +62,15 @@ class CreateEventToolTest(unittest.TestCase):
         self.assertIn("never sent", desc)
         self.assertIn("絕不寄出", desc)
 
+    def test_mcp_lists_only_tools_it_can_call(self):
+        import agent_bridge
+        import mcp_server
+        self.assertIn("create_event", [t["name"] for t in agent_bridge.TOOLS])
+        names = [t["name"] for t in mcp_server.mcp_tools()]
+        self.assertNotIn("create_event", names)
+        self.assertNotIn("find_free_time", names)
+        self.assertEqual(set(names), set(mcp_server.TOOL_SPECS))
+
     def test_explicit_args_through_the_agent_bridge(self):
         status, out = srv.post("/api/v1/tools/create_event", {
             "title": "Vendor check-in", "start": "2027-05-12T10:00", "duration_minutes": 30,
@@ -87,6 +96,8 @@ class CreateEventToolTest(unittest.TestCase):
         self.assertEqual([a["email"] for a in ev["attendees"]], ["pat@example.com"])
         self.assertEqual(out["parsed"]["source"], "heuristic")
         self.assertIn("AI 代訂", ev["description"])
+        self.assertNotIn("下週二", ev["description"], "the raw ask is not copied into the invite")
+        self.assertNotIn("下週二", out["invite"]["ics"])
         self.assertFalse(out["invite"]["sent"])
 
     def test_picks_the_first_slot_everyone_is_free(self):

@@ -8,7 +8,10 @@
   Nothing is mailed, posted or pushed anywhere; every response that makes one says sent: false.
 - Colleague feeds keep their raw ICS in cal_feeds and are expanded per query. A URL feed is fetched
   only when it is added or refreshed, through the agent bridge's URL guard (loopback / private
-  hosts need allow_private, plain http needs it too).
+  hosts need allow_private, plain http needs it too). Those two routes refuse any browser Origin
+  other than this server's own (127.0.0.1 / localhost on the same port), so another web page
+  cannot make this machine fetch an intranet URL.
+- Feeds and local events are kept by the core cache clear; delete a feed with /api/cal/feed/delete.
 - All-day events count as free unless they are marked OPAQUE or read like time off.
 """
 from __future__ import annotations
@@ -1768,7 +1771,7 @@ def propose(ask: str, lang: str, tz_name: str | None = None, now_override=None, 
         "start": start.strftime("%Y-%m-%dT%H:%M") if start else "",
         "end": (start + timedelta(minutes=minutes)).strftime("%Y-%m-%dT%H:%M") if start else "",
         "attendees": found["attendees"], "location": found.get("location") or "",
-        "description": found.get("description") or ((f"AI 代訂：{ask}" if zh else f"Booked by AI from: {ask}")[:2000]),
+        "description": found.get("description") or ("由 AI 代訂（TooPowerInbox）" if zh else "Booked by AI (TooPowerInbox)"),
     }
     clash = conflicts(start, start + timedelta(minutes=minutes), found["attendees"], "", lang) if start else []
     label = (f"AI 解析 · {driver}" if zh else f"AI parse · {driver}") if source == "agent" else \
@@ -1977,8 +1980,28 @@ def cal_feeds(req):
     return {"feeds": list_feeds()}
 
 
+def _local_origin(req) -> bool:
+    """True for no Origin (curl, scripts) or this server's own UI; any other page is refused."""
+    handler = req.handler
+    origin = handler.headers.get("Origin") if handler is not None else None
+    if origin is None:
+        return True
+    try:
+        port = handler.server.server_address[1]
+    except (AttributeError, IndexError, TypeError):
+        port = int(os.environ.get("OPENINBOX_PORT", "8770"))
+    return origin.strip().lower().rstrip("/") in (f"http://127.0.0.1:{port}", f"http://localhost:{port}")
+
+
+def _foreign_origin(req) -> tuple[dict, int]:
+    return _bad("cross-origin request refused: open the calendar from this app",
+                "拒絕跨來源請求：請從本機 App 介面操作", _lang(req), 403)
+
+
 @post("/api/cal/feeds")
 def cal_feeds_add(req):
+    if not _local_origin(req):
+        return _foreign_origin(req)
     return add_feed(req.body, _lang(req))
 
 
@@ -1989,6 +2012,8 @@ def cal_feeds_demo(req):
 
 @post("/api/cal/feed/refresh")
 def cal_feed_refresh(req):
+    if not _local_origin(req):
+        return _foreign_origin(req)
     return refresh_feed(req.body.get("id"), _lang(req))
 
 
