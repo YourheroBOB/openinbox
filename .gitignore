@@ -17,3 +17,4 @@ vault/cards/*.md
 .idea/
 .vscode/
 *.log
+.pr-review/
