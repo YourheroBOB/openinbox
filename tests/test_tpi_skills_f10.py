@@ -180,19 +180,19 @@ class CrmTest(unittest.TestCase):
 
     def test_contacts_api(self):
         run("crm-contact", person="maya@studio.example")
-        _, listing = srv.get("/api/contacts")
+        _, listing = srv.get("/api/crm/contacts")
         self.assertEqual([c["email"] for c in listing["contacts"]], ["maya@studio.example"])
         self.assertEqual(listing["contacts"][0]["stage"], "lead")
-        status, out = srv.post("/api/contacts/update", {"email": "maya@studio.example", "stage": "partner",
+        status, out = srv.post("/api/crm/contacts/update", {"email": "maya@studio.example", "stage": "partner",
                                                         "tags": "design", "note": "Contract designer"})
         self.assertEqual(status, 200, out)
         self.assertEqual((out["contact"]["stage"], out["contact"]["tags"]), ("partner", ["design"]))
-        self.assertEqual(srv.get("/api/contacts?q=contract")[1]["contacts"][0]["email"], "maya@studio.example")
-        self.assertEqual(srv.get("/api/contacts?q=zzz")[1]["contacts"], [])
-        self.assertEqual(srv.post("/api/contacts/update", {"email": "maya@studio.example", "stage": "boss"})[0], 400)
-        self.assertEqual(srv.post("/api/contacts/update", {"email": "x@nobody.example"})[0], 404)
-        self.assertEqual(srv.post("/api/contacts/delete", {"email": "maya@studio.example"})[0], 200)
-        self.assertEqual(srv.post("/api/contacts/delete", {"email": "maya@studio.example"})[0], 404)
+        self.assertEqual(srv.get("/api/crm/contacts?q=contract")[1]["contacts"][0]["email"], "maya@studio.example")
+        self.assertEqual(srv.get("/api/crm/contacts?q=zzz")[1]["contacts"], [])
+        self.assertEqual(srv.post("/api/crm/contacts/update", {"email": "maya@studio.example", "stage": "boss"})[0], 400)
+        self.assertEqual(srv.post("/api/crm/contacts/update", {"email": "x@nobody.example"})[0], 404)
+        self.assertEqual(srv.post("/api/crm/contacts/delete", {"email": "maya@studio.example"})[0], 200)
+        self.assertEqual(srv.post("/api/crm/contacts/delete", {"email": "maya@studio.example"})[0], 404)
         self.assertEqual(skills.load_contacts(), [])
 
     def test_crm_shows_up_in_brief(self):

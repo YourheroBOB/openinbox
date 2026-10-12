@@ -16,6 +16,7 @@ import features.usage as usage
 
 AGENT_PATH = srv.ROOT / "agent.json"
 SECRET = "fake-" + secrets.token_hex(12)
+LEAK_MAIL = "Can you confirm the Friday scope"
 
 
 class FakeModel(BaseHTTPRequestHandler):
@@ -29,7 +30,7 @@ class FakeModel(BaseHTTPRequestHandler):
         body = json.loads(self.rfile.read(int(self.headers.get("Content-Length") or 0)))
         FakeModel.seen.append({"body": body, "auth": self.headers.get("Authorization")})
         if FakeModel.mode["status"] != 200:
-            raw = b'{"error":"boom"}'
+            raw = json.dumps({"error": "boom", "echo": f"Bearer {SECRET} / {LEAK_MAIL}"}).encode()
             self.send_response(FakeModel.mode["status"])
         else:
             out = {"model": "fake-model-v2", "choices": [{"message": {"content": "fake answer"}}]}
@@ -128,7 +129,33 @@ class RecordTest(unittest.TestCase):
         r = self.lines()[-1]
         self.assertFalse(r["ok"])
         self.assertEqual(r["completion_tokens"], 0)
-        self.assertIn("HTTP 500", r["error"])
+        self.assertEqual(r["error"], "RuntimeError: HTTP 500")
+        raw = usage.USAGE_PATH.read_text()
+        for leak in (SECRET, LEAK_MAIL, "boom", "echo", "agent endpoint"):
+            self.assertNotIn(leak, raw)
+
+    def test_cli_failure_keeps_only_exit_code(self):
+        script = (f"import sys; sys.stderr.write('token={SECRET} mail: {LEAK_MAIL}\\n'); sys.exit(7)")
+        AGENT_PATH.write_text(json.dumps({"driver": "cli", "cli": {"command": [sys.executable, "-c", script],
+                                                                   "timeout_sec": 20}}))
+        _, out = srv.post("/api/skills/run", {"skill": "catch-me-up"})
+        self.assertEqual(out["source"], "heuristic")
+        r = self.lines()[-1]
+        self.assertEqual((r["driver"], r["ok"], r["feature"]), ("cli", False, "skills:catch-me-up"))
+        self.assertEqual(r["error"], "RuntimeError: exit 7")
+        raw = usage.USAGE_PATH.read_text()
+        for leak in (SECRET, LEAK_MAIL, "token=", "mail:"):
+            self.assertNotIn(leak, raw)
+
+    def test_error_label(self):
+        import subprocess
+        import urllib.error
+        self.assertEqual(usage.error_label(RuntimeError(f"agent endpoint HTTP 401: {SECRET}")), "RuntimeError: HTTP 401")
+        self.assertEqual(usage.error_label(RuntimeError(f"{SECRET} {LEAK_MAIL}")), "RuntimeError")
+        self.assertEqual(usage.error_label(RuntimeError(SECRET), 2), "RuntimeError: exit 2")
+        self.assertEqual(usage.error_label(subprocess.TimeoutExpired(["x", SECRET], 5)), "TimeoutExpired")
+        self.assertEqual(usage.error_label(urllib.error.HTTPError("http://h/", 403, SECRET, {}, None)), "HTTPError: HTTP 403")
+        self.assertEqual(usage.error_label(ValueError(f"blocked url http://{SECRET}.example/")), "ValueError")
 
     def test_cli_and_http_drivers(self):
         AGENT_PATH.write_text(json.dumps({"driver": "cli", "cli": {"command": [sys.executable, "-c", "print('ok ' * 8)"],

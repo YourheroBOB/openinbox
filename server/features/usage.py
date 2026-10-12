@@ -6,7 +6,8 @@ Copilot, triage, skills and /api/v1/agent/run are all counted without editing
 them. Token counts come from the provider's `usage` block when it returns one;
 otherwise they are estimated (CJK char = 1 token, other text = 4 chars per
 token) and the entry is marked `estimated`. Only counts and metadata are kept:
-never the prompt, the answer, the endpoint path or any API key.
+never the prompt, the answer, the endpoint path, any API key, or an error's
+message (a failed call keeps only its exception class and HTTP status / exit code).
 
     GET  /api/usage?days=30&limit=50   totals, per driver/model/feature/day, recent calls
     POST /api/usage/clear              truncate the log
@@ -27,11 +28,15 @@ from pathlib import Path
 import agent_bridge
 import yhbmail
 from features import get, post
+from features._origin import local_origin, refuse
 
 USAGE_PATH: Path = yhbmail.DATA / "usage.jsonl"
 CJK_RE = re.compile(r"[\u3000-\u9fff\uac00-\ud7af\uf900-\ufaff\uff00-\uffef]")
 _lock = threading.Lock()
 _feature: contextvars.ContextVar[str] = contextvars.ContextVar("tpi_usage_feature", default="")
+_cli_exit: contextvars.ContextVar[int | None] = contextvars.ContextVar("tpi_usage_cli_exit", default=None)
+# agent_bridge._post_json raises RuntimeError("agent endpoint HTTP <status>: <response body>")
+HTTP_STATUS_RE = re.compile(r"^agent endpoint HTTP (\d{3})\b")
 
 # function name in the call stack -> feature label, for callers that do not set a scope
 CALLERS = {
@@ -150,6 +155,36 @@ def _answer_text(data) -> str:
         return str(data.get("answer") or data.get("text") or "")
 
 
+def error_label(exc: BaseException, exit_code: int | None = None) -> str:
+    """Exception class plus HTTP status or exit code. Never the message: it can carry the endpoint's
+    response body or the CLI's stderr (echoed prompts, mail text, credentials)."""
+    label = type(exc).__name__
+    code = getattr(exc, "code", None) if isinstance(getattr(exc, "code", None), int) else None
+    m = HTTP_STATUS_RE.match(str(exc)) if code is None else None
+    if m:
+        code = int(m.group(1))
+    if code is not None:
+        return f"{label}: HTTP {code}"
+    if exit_code is not None:
+        return f"{label}: exit {exit_code}"
+    return label
+
+
+class _RunSpy:
+    """Stands in for the subprocess module inside agent_bridge so _cli's exit code is known."""
+
+    def __init__(self, mod):
+        self._mod = mod
+
+    def __getattr__(self, name):
+        return getattr(self._mod, name)
+
+    def run(self, *a, **kw):
+        p = self._mod.run(*a, **kw)
+        _cli_exit.set(p.returncode)
+        return p
+
+
 def _wrap_post_json(orig):
     def _post_json(url, headers, body, timeout=90, allow_private=False):
         try:
@@ -167,7 +202,7 @@ def _wrap_post_json(orig):
             data = orig(url, headers, body, timeout=timeout, allow_private=allow_private)
         except Exception as e:
             record(driver, model, estimate_tokens(prompt), 0, True, False, feature, host,
-                   int((time.monotonic() - started) * 1000), f"{type(e).__name__}: {e}")
+                   int((time.monotonic() - started) * 1000), error_label(e))
             raise
         nums = _usage_numbers(data)
         if nums:
@@ -191,12 +226,15 @@ def _wrap_cli(orig):
         prompt = json.dumps(pack, ensure_ascii=False)[:24000]
         feature = current_feature()
         started = time.monotonic()
+        exit_token = _cli_exit.set(None)
         try:
             out = orig(pack, cfg)
         except Exception as e:
             record("cli", model, estimate_tokens(prompt), 0, True, False, feature, "",
-                   int((time.monotonic() - started) * 1000), f"{type(e).__name__}: {e}")
+                   int((time.monotonic() - started) * 1000), error_label(e, _cli_exit.get()))
             raise
+        finally:
+            _cli_exit.reset(exit_token)
         record("cli", model, estimate_tokens(prompt), estimate_tokens(out), True, True, feature, "",
                int((time.monotonic() - started) * 1000))
         return out
@@ -210,6 +248,8 @@ def install() -> None:
         agent_bridge._post_json = _wrap_post_json(agent_bridge._post_json)
     if not getattr(agent_bridge._cli, "__tpi_usage__", False):
         agent_bridge._cli = _wrap_cli(agent_bridge._cli)
+    if not isinstance(agent_bridge.subprocess, _RunSpy):
+        agent_bridge.subprocess = _RunSpy(agent_bridge.subprocess)
 
 
 install()
@@ -310,6 +350,8 @@ def usage_report(req):
 
 @post("/api/usage/clear")
 def usage_clear(req):
+    if not local_origin(req):
+        return refuse(req.lang_zh())
     n = clear()
     note = f"已清除 {n} 筆用量紀錄。" if req.lang_zh() else f"Cleared {n} usage entries."
     return {"ok": True, "cleared": n, "note": note}

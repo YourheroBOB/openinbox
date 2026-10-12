@@ -4,9 +4,15 @@ from __future__ import annotations
 import json
 import sys
 import unittest
+import urllib.error
+import urllib.request
+from unittest import mock
 
 import _tpi_server as srv
+import agent_bridge
 import features.skills as skills
+import features.triage as triage
+import features.usage as usage
 
 AGENT_PATH = srv.ROOT / "agent.json"
 ALL = ["morning-brief", "catch-me-up", "organize-inbox", "find-it",
@@ -149,11 +155,92 @@ class AgentRewriteTest(unittest.TestCase):
         self.assertEqual(out["source"], "heuristic")
         self.assertTrue(out["agent_error"])
 
+    def test_agent_false_or_zero_calls_no_model(self):
+        usage.clear()
+        self.addCleanup(usage.clear)
+        for driver in ("cli", "openai_compatible", "http"):
+            AGENT_PATH.write_text(json.dumps({
+                "driver": driver, "cli": {"command": [sys.executable, "-c", "print('X')"], "timeout_sec": 20},
+                "openai_compatible": {"base_url": "http://127.0.0.1:9/v1", "model": "m", "allow_private": True},
+                "http": {"url": "http://127.0.0.1:9/agent", "allow_private": True}}))
+            for value in (False, 0, 0.0, "off", "OFF", "false", "0", "no", " no "):
+                with self.subTest(driver=driver, agent=value), \
+                        mock.patch.object(triage, "ask_agent", side_effect=AssertionError("ask_agent")) as ask, \
+                        mock.patch.object(agent_bridge, "_post_json", side_effect=AssertionError("_post_json")) as pj, \
+                        mock.patch.object(agent_bridge, "_cli", side_effect=AssertionError("_cli")) as cli, \
+                        mock.patch.object(agent_bridge, "_http", side_effect=AssertionError("_http")) as http:
+                    status, out = srv.post("/api/skills/run", {"skill": "catch-me-up", "agent": value})
+                    self.assertEqual(status, 200, out)
+                    self.assertEqual((out["source"], out["agent_text"]), ("heuristic", ""))
+                    self.assertNotIn("agent_error", out)
+                    for m in (ask, pj, cli, http):
+                        m.assert_not_called()
+        self.assertEqual(usage.read_entries(), [])
+
+    def test_agent_true_or_auto_still_rewrites(self):
+        self.use_cli("print('REWRITE')")
+        for value in (True, 1, "auto", "", None):
+            with self.subTest(agent=value):
+                body = {"skill": "catch-me-up"} if value is None else {"skill": "catch-me-up", "agent": value}
+                _, out = srv.post("/api/skills/run", body)
+                self.assertEqual(out["source"], "agent")
+        self.assertTrue(skills.agent_off(False))
+        self.assertFalse(skills.agent_off(None))
+
     def test_slide_and_crm_stay_local(self):
         self.use_cli("print('SHOULD NOT BE USED')")
         _, out = srv.post("/api/skills/run", {"skill": "slide", "markdown": "# A\n- b"})
         self.assertEqual(out["source"], "heuristic")
         self.assertEqual(out["agent_text"], "")
+
+
+def post_from(path: str, body: dict, origin: str):
+    req = urllib.request.Request(srv.BASE + path, data=json.dumps(body).encode(), method="POST",
+                                 headers={"Content-Type": "application/json", "Origin": origin})
+    try:
+        with urllib.request.urlopen(req, timeout=20) as r:
+            return r.status, json.loads(r.read().decode())
+    except urllib.error.HTTPError as e:
+        return e.code, json.loads(e.read().decode())
+
+
+class OriginTest(unittest.TestCase):
+    def setUp(self):
+        reset()
+        usage.clear()
+        skills.contacts_path().unlink(missing_ok=True)
+        self.addCleanup(skills.contacts_path().unlink, missing_ok=True)
+        self.addCleanup(reset)
+
+    def test_state_changing_routes_refuse_other_origins(self):
+        skills.run_skill("crm-contact", {"person": "Samira"})
+        email = skills.load_contacts()[0]["email"]
+        usage.record("cli", "x", 1, 1)
+        routes = [("/api/skills/settings", {"slug": "find-it", "enabled": False}),
+                  ("/api/skills/run", {"skill": "slide", "markdown": "# A\n- b"}),
+                  ("/api/crm/contacts/update", {"email": email, "stage": "partner"}),
+                  ("/api/crm/contacts/delete", {"email": email}),
+                  ("/api/usage/clear", {})]
+        slides = lambda: len(list(skills.slides_dir().glob("*.html"))) if skills.slides_dir().is_dir() else 0
+        before = slides()
+        for origin in ("http://evil.example", "http://127.0.0.1:1", "null"):
+            for path, body in routes:
+                with self.subTest(origin=origin, path=path):
+                    status, out = post_from(path, body, origin)
+                    self.assertEqual(status, 403, out)
+                    self.assertIn("cross-origin", out["error"])
+        self.assertTrue(skills.is_enabled("find-it"))
+        self.assertEqual(slides(), before)
+        self.assertEqual(skills.load_contacts()[0]["stage"], "lead")
+        self.assertEqual(len(usage.read_entries()), 1)
+        own = srv.BASE
+        for path, body in routes:
+            with self.subTest(origin=own, path=path):
+                status, out = post_from(path, body, own)
+                self.assertEqual(status, 200, out)
+        self.assertFalse(skills.is_enabled("find-it"))
+        self.assertEqual(skills.load_contacts(), [])
+        self.assertEqual(usage.read_entries(), [])
 
 
 if __name__ == "__main__":

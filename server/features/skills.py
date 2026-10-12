@@ -33,6 +33,7 @@ import yhbmail
 from features import Raw, get, post
 from features import triage
 from features import usage
+from features._origin import local_origin, refuse
 
 SKILLS = [
     {"slug": "morning-brief", "group": "F09", "prompt": "morning-brief", "inputs": ["today"],
@@ -214,6 +215,39 @@ def disabled_error(slug: str, lang: str) -> dict:
 
 def all_mail(limit: int = 500) -> list[dict]:
     return yhbmail.list_emails(limit=limit)
+
+
+def _py_lower(value) -> str:
+    return value.lower() if isinstance(value, str) else ""
+
+
+def query_mail(where: list[str], args: list) -> list[dict]:
+    """Every cached email matching all `where` clauses, newest first, with no row cap.
+
+    Clauses may call tpi_lower(col), which is Python str.lower (SQLite's lower() only folds ASCII),
+    so `instr(tpi_lower(col), ?) > 0` selects exactly the rows a Python `term in col.lower()` would.
+    """
+    sql = "SELECT * FROM emails" + (" WHERE " + " AND ".join(where) if where else "") + " ORDER BY date_ts DESC"
+    con = yhbmail.db()
+    try:
+        con.create_function("tpi_lower", 1, _py_lower, deterministic=True)
+        rows = [dict(r) for r in con.execute(sql, args)]
+    finally:
+        con.close()
+    for r in rows:
+        r["labels"] = json.loads(r.pop("labels_json", None) or "[]")
+    return rows
+
+
+def _contains_any(cols: tuple[str, ...], needles: list[str], args: list) -> str:
+    hay = " || ' ' || ".join(f"COALESCE({c}, '')" for c in cols)
+    args.extend(needles)
+    return "(" + " OR ".join(f"instr(tpi_lower({hay}), ?) > 0" for _ in needles) + ")"
+
+
+def mail_containing(cols: tuple[str, ...], needles: list[str]) -> list[dict]:
+    args: list = []
+    return query_mail([_contains_any(cols, needles, args)], args)
 
 
 def mail_item(row: dict, lang: str) -> dict:
@@ -557,13 +591,33 @@ def run_find_it(args: dict, lang: str) -> dict:
             return 0
         return score
 
-    rows = all_mail()
+    def candidates(mode: str) -> list[dict]:
+        where, sql_args = [], []
+        for f in p["from"]:
+            where.append(_contains_any(("from_addr",), [f], sql_args))
+        for t in p["to"]:
+            where.append(_contains_any(("to_addr",), [t], sql_args))
+        if p["unread"]:
+            where.append("unread = 1")
+        if p["after"]:
+            where.append("COALESCE(date_ts, 0) >= ?")
+            sql_args.append(p["after"])
+        if p["before"]:
+            where.append("COALESCE(date_ts, 0) < ?")
+            sql_args.append(p["before"])
+        if p["terms"]:
+            cols = ("subject", "from_addr", "snippet", "body_text")
+            if mode == "all":
+                where += [_contains_any(cols, [t], sql_args) for t in p["terms"]]
+            else:
+                where.append(_contains_any(cols, p["terms"], sql_args))
+        return query_mail(where, sql_args)
+
     mode = "all"
-    scored = [(mail_score(r, mode), r) for r in rows]
-    scored = [x for x in scored if x[0] > 0]
+    scored = [x for x in ((mail_score(r, mode), r) for r in candidates(mode)) if x[0] > 0]
     if not scored and len(p["terms"]) > 1:
         mode = "any"
-        scored = [x for x in ((mail_score(r, mode), r) for r in rows) if x[0] > 0]
+        scored = [x for x in ((mail_score(r, mode), r) for r in candidates(mode)) if x[0] > 0]
     scored.sort(key=lambda x: (-x[0], -(x[1].get("date_ts") or 0)))
     first = p["terms"][0] if p["terms"] else ""
     mails = []
@@ -682,7 +736,8 @@ def run_meeting_prep(args: dict, lang: str) -> dict:
                 "message": "行事曆是空的，先按「同步」。" if zh else "The calendar is empty; hit Sync first."}
     kw = keywords(ev.get("title") or "")
     related = []
-    for r in all_mail():
+    cols = ("subject", "from_addr", "snippet", "body_text")
+    for r in (mail_containing(cols, list(kw)) if kw else []):
         hay = f"{r.get('subject') or ''} {r.get('from_addr') or ''} {r.get('snippet') or ''} {r.get('body_text') or ''}".lower()
         score = sum(w for k, w in kw.items() if k in hay)
         if score >= 2:
@@ -758,7 +813,7 @@ def resolve_person(args: dict) -> tuple[str, str]:
         addr = (m.group(1) if m else person).strip().lower()
         return addr, addr
     if person:
-        for r in all_mail():
+        for r in mail_containing(("from_addr",), [person.lower()]):
             name, addr = triage.sender(r)
             if person.lower() in name.lower():
                 return person, addr
@@ -769,7 +824,7 @@ def person_profile(email: str, lang: str) -> dict | None:
     email = email.lower()
     rows = []
     name = ""
-    for r in all_mail():
+    for r in mail_containing(("from_addr", "to_addr"), [email]):
         n, addr = triage.sender(r)
         frm = addr == email
         to = email in (r.get("to_addr") or "").lower()
@@ -1134,6 +1189,17 @@ def source_label(source: str, driver: str, lang: str) -> str:
     return "本機規則結果（未接 LLM）" if _zh(lang) else "Local rule-based result (no LLM)"
 
 
+def agent_off(value) -> bool:
+    """`agent` arg: missing / "" / "auto" / true -> use the BYO agent; false, 0, "off", "false", "0", "no" -> don't."""
+    if value is None:
+        return False
+    if isinstance(value, bool):
+        return not value
+    if isinstance(value, (int, float)):
+        return value == 0
+    return str(value).strip().lower() in ("off", "false", "0", "no")
+
+
 def run_skill(slug: str, args: dict | None = None, lang: str = "en") -> tuple[dict, int]:
     args = args if isinstance(args, dict) else {}
     if slug not in BY_SLUG:
@@ -1149,8 +1215,7 @@ def run_skill(slug: str, args: dict | None = None, lang: str = "en") -> tuple[di
             return out, status
         driver = triage.agent_driver()
         source, agent_text, agent_error = "heuristic", "", None
-        want = str(args.get("agent") or "auto").lower()
-        if slug in AGENT_SKILLS and driver != "local" and want not in ("off", "false", "0", "no"):
+        if slug in AGENT_SKILLS and driver != "local" and not agent_off(args.get("agent")):
             text, used, agent_error = triage.ask_agent(agent_prompt(slug, out["markdown"], lang), lang)
             if text:
                 source, agent_text, driver = "agent", text[:8000], used
@@ -1213,6 +1278,8 @@ def skills_list(req):
 
 @post("/api/skills/settings")
 def skills_settings(req):
+    if not local_origin(req):
+        return refuse(req.lang_zh())
     b = req.body
     if isinstance(b.get("enabled"), dict):
         changes = b["enabled"]
@@ -1230,6 +1297,8 @@ def skills_settings(req):
 
 @post("/api/skills/run")
 def skills_run(req):
+    if not local_origin(req):
+        return refuse(req.lang_zh())
     b = dict(req.body)
     slug = str(b.pop("skill", "") or b.pop("slug", "") or "")
     lang = _lang(req)
@@ -1257,7 +1326,7 @@ def slide_file(req):
     return Raw(path.read_bytes(), "text/html; charset=utf-8")
 
 
-@get("/api/contacts")
+@get("/api/crm/contacts")
 def contacts_list(req):
     q = (req.query.get("q") or "").strip().lower()
     rows = load_contacts()
@@ -1267,8 +1336,10 @@ def contacts_list(req):
     return {"contacts": rows, "file": _rel(contacts_path()), "stages": list(STAGES)}
 
 
-@post("/api/contacts/update")
+@post("/api/crm/contacts/update")
 def contacts_update(req):
+    if not local_origin(req):
+        return refuse(req.lang_zh())
     b = req.body
     email = str(b.get("email") or "").strip().lower()
     if not email or not get_contact(email):
@@ -1292,8 +1363,10 @@ def contacts_update(req):
     return {"ok": True, "contact": c}
 
 
-@post("/api/contacts/delete")
+@post("/api/crm/contacts/delete")
 def contacts_delete(req):
+    if not local_origin(req):
+        return refuse(req.lang_zh())
     email = str(req.body.get("email") or "").strip().lower()
     with _lock:
         rows = load_contacts()
