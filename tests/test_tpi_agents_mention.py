@@ -68,8 +68,14 @@ class ParseMentionTest(unittest.TestCase):
 
     def test_alias_recognition_is_routing_only(self):
         self.assertTrue(A.mentions_alias("Agent <agent@example.com>"))
+        self.assertTrue(A.mentions_alias("maya@example.com, Agent <agent@example.com>"))
+        self.assertTrue(A.mentions_alias("Agent <" + "agent@example.com".upper() + ">"))
         self.assertFalse(A.mentions_alias("samira@northwind.example"))
         self.assertFalse(A.mentions_alias(""))
+        self.assertFalse(A.mentions_alias("myagent@example.com"))
+        self.assertFalse(A.mentions_alias("not-agent@example.com"))
+        self.assertFalse(A.mentions_alias("agent@example.com" + ".attacker"))
+        self.assertFalse(A.mentions_alias("agent@example.com <other@example.com>"))
 
 
 class MentionHttpTest(unittest.TestCase):
@@ -119,6 +125,13 @@ class MentionHttpTest(unittest.TestCase):
         con.close()
         self._added.append(eid)
         return eid
+
+    def test_lookalike_alias_does_not_trigger_from_cache(self):
+        eid = self._cache_row("demo:test:lookalike", "Bot <myagent@example.com>",
+                              "Please research the Northwind contact before Friday.")
+        status, body = srv.call("POST", "/api/agents/mention", {"email_id": eid, "lang": "en"})
+        self.assertEqual(status, 200)
+        self.assertFalse(body["triggered"])
 
     def test_local_message_addressed_to_alias_triggers(self):
         eid = self._cache_row("demo:test:alias1", "Agent <agent@example.com>",

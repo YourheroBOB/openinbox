@@ -66,8 +66,19 @@ class TaskRunTest(unittest.TestCase):
             res = A.run_task("meeting_prep", "Investor call", "", "en")
         self.assertEqual(res["driver"], "local")
         self.assertTrue(res["fallback"])
-        self.assertIn("worker down", res["error"])
+        self.assertEqual(res["error"], "RuntimeError")
+        self.assertNotIn("worker down", res["error"])
         self.assertIn("Meeting prep", res["text"])
+
+    def test_external_failure_hides_upstream_body(self):
+        cfg = {"driver": "http", "http": {"url": "https://agent.example.com/x"}}
+        leaked = "agent endpoint HTTP 502: sk-secret prompt echo"
+        with mock.patch("agent_bridge.load_agent_cfg", return_value=cfg), \
+                mock.patch("agent_bridge._http", side_effect=RuntimeError(leaked)):
+            res = A.run_task("research_person", "Samira Ortiz", "", "en")
+        self.assertEqual(res["error"], "RuntimeError: HTTP 502")
+        self.assertNotIn("sk-secret", res["error"])
+        self.assertNotIn("prompt echo", res["error"])
 
     def test_empty_external_answer_falls_back(self):
         cfg = {"driver": "cli", "cli": {"command": ["cat"]}}
@@ -209,6 +220,31 @@ class CoreHttpTest(unittest.TestCase):
         with self.assertRaises(urllib.error.HTTPError) as cm2:
             urllib.request.urlopen(req2, timeout=10)
         self.assertEqual(cm2.exception.code, 403)
+
+    def test_deliverable_get_refuses_cross_origin(self):
+        import urllib.error
+        import urllib.request
+        status, body = srv.call("POST", "/api/agents/task",
+                                {"kind": "research_person", "target": "Samira Ortiz", "lang": "en"})
+        self.assertEqual(status, 200, body)
+        did = body["deliverable"]["id"]
+        secret = b"Samira Ortiz"
+        for path in (f"/api/agents/deliverables?limit=50", f"/api/agents/deliverables/{did}.md"):
+            req = urllib.request.Request(
+                srv.BASE + path, headers={"Origin": "https://evil.example"}, method="GET")
+            with self.assertRaises(urllib.error.HTTPError) as cm:
+                urllib.request.urlopen(req, timeout=10)
+            self.assertEqual(cm.exception.code, 403, path)
+            raw = cm.exception.read()
+            self.assertNotIn(secret, raw)
+            self.assertNotIn(b"Local sources", raw)
+        port = srv.SERVER.server_address[1]
+        own = urllib.request.Request(
+            srv.BASE + "/api/agents/deliverables",
+            headers={"Origin": f"http://127.0.0.1:{port}"}, method="GET")
+        with urllib.request.urlopen(own, timeout=10) as r:
+            self.assertEqual(r.status, 200)
+            self.assertIn(b"deliverables", r.read())
 
 
 if __name__ == "__main__":
