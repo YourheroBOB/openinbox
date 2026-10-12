@@ -107,6 +107,34 @@ class ConfirmGateTest(OutboxCase):
         self.assertEqual(con.execute("SELECT COUNT(*) FROM drafts").fetchone()[0], 1)
         con.close()
 
+    def test_confirm_refuses_a_draft_saved_while_the_dialog_is_open(self):
+        draft = make_draft(subject="Original subject")
+        p = self.prepared(draft)
+        saved, status = compose.save_draft({
+            "id": draft, "to": "maya@example.com", "subject": "Newer subject",
+            "text": "Hi Maya,\n\nUpdated after the dialog opened.",
+        }, "en")
+        self.assertEqual(status, 200, saved)
+        out, status = outbox.confirm({"id": p["item"]["id"], "token": p["token"], "ack": True}, "en")
+        self.assertEqual(status, 409, out)
+        self.assertEqual(outbox._row(p["item"]["id"])["state"], "awaiting_confirm")
+        got = compose.get_draft(draft)
+        self.assertIsNotNone(got)
+        self.assertEqual(got["subject"], "Newer subject")
+        self.assertIn("Updated after the dialog opened.", got["body"])
+        self.assertEqual(outbox.release_due(at(24 * 400)), [])
+
+    def test_confirming_the_same_draft_twice_releases_once(self):
+        draft = make_draft()
+        p = self.prepared(draft)
+        body = {"id": p["item"]["id"], "token": p["token"], "ack": True}
+        self.assertEqual(outbox.confirm(body, "en")[1], 200)
+        self.assertIsNone(compose.get_draft(draft))
+        out, status = outbox.confirm(body, "en")
+        self.assertEqual(status, 409, out)
+        self.assertEqual(len(outbox.release_due(at(1))), 1)
+        self.assertEqual(outbox.release_due(at(1)), [])
+
     def test_re_prepare_supersedes_the_old_preview(self):
         draft = make_draft()
         first = self.prepared(draft)
@@ -152,6 +180,24 @@ class AgentCannotConfirmTest(OutboxCase):
         status, out = srv.post("/api/outbox/confirm", {"id": oid, "ack": True})
         self.assertEqual(status, 403, out)
 
+    def test_user_edit_after_agent_propose_blocks_confirm(self):
+        draft = make_draft(subject="Agent saw this")
+        out = outbox.agent_bridge.invoke_tool("outbox_propose", {"draft_id": draft, "lang": "en"})
+        self.assertEqual(out["item"]["state"], "awaiting_confirm")
+        self.assertNotIn("token", out)
+        saved, status = compose.save_draft({
+            "id": draft, "to": "maya@example.com", "subject": "User rewrite",
+            "text": "Different body the user typed.",
+        }, "en")
+        self.assertEqual(status, 200, saved)
+        status, review = srv.post("/api/outbox/review", {"id": out["item"]["id"]})
+        self.assertEqual(status, 200, review)
+        status, confirmed = srv.post("/api/outbox/confirm", {
+            "id": out["item"]["id"], "token": review["token"], "ack": True})
+        self.assertEqual(status, 409, confirmed)
+        self.assertEqual(compose.get_draft(draft)["subject"], "User rewrite")
+        self.assertEqual(outbox._row(out["item"]["id"])["state"], "awaiting_confirm")
+
     def test_user_reviews_then_confirms_an_agent_proposal(self):
         out = outbox.agent_bridge.invoke_tool("outbox_propose", {
             "to": "maya@example.com", "subject": "Agenda", "body": "Agenda for Friday attached below."})
@@ -190,6 +236,47 @@ class OriginGuardTest(OutboxCase):
         port = srv.SERVER.server_address[1]
         own = {"Origin": f"http://127.0.0.1:{port}", "Sec-Fetch-Site": "same-origin"}
         self.assertEqual(self.post_with("/api/outbox/prepare", {"draft_id": draft}, own), 201)
+
+    def get_with(self, path, headers):
+        req = srv.urllib.request.Request(srv.BASE + path, method="GET", headers=headers)
+        try:
+            with srv.urllib.request.urlopen(req, timeout=20) as r:
+                return r.status, r.read()
+        except srv.urllib.error.HTTPError as e:
+            return e.code, e.read()
+
+    def test_cross_site_get_hides_bcc_and_does_not_release(self):
+        draft = make_draft(bcc="secret-bcc@example.com", text="Hidden body line alpha.")
+        item = self.confirmed(draft_id=draft, mode="now")
+        con = srv.yhbmail.db()
+        con.execute("UPDATE outbox SET release_ts=? WHERE id=?", (outbox.now_dt().timestamp() - 5, item["id"]))
+        con.commit()
+        con.close()
+        for path in ("/api/outbox/items", f"/api/outbox/item/{item['id']}"):
+            status, raw = self.get_with(path, {"Origin": "https://evil.example", "Sec-Fetch-Site": "cross-site"})
+            self.assertEqual(status, 403, path)
+            self.assertNotIn(b"secret-bcc@example.com", raw)
+            self.assertNotIn(b"Hidden body line alpha", raw)
+        self.assertEqual(outbox._row(item["id"])["state"], "undo_window")
+        status, raw = self.get_with("/api/outbox/items", {})
+        self.assertEqual(status, 200, raw[:200])
+        self.assertIn(b"secret-bcc@example.com", raw)
+        self.assertEqual(outbox._row(item["id"])["state"], "undo_window", "GET must not release due mail")
+        released = outbox.release_due()
+        self.assertEqual([r["id"] for r in released], [item["id"]])
+        status, raw = self.get_with(f"/api/outbox/eml/{item['id']}.eml", {"Origin": "https://evil.example"})
+        self.assertEqual(status, 403)
+        self.assertNotIn(b"secret-bcc@example.com", raw)
+        self.assertNotIn(b"Hidden body line alpha", raw)
+
+    def test_forwarded_browser_port_is_the_host_port(self):
+        draft = make_draft()
+        forwarded = {"Origin": "http://127.0.0.1:8771", "Host": "127.0.0.1:8771", "Sec-Fetch-Site": "same-origin"}
+        self.assertEqual(self.post_with("/api/outbox/prepare", {"draft_id": draft}, forwarded), 201)
+        mismatch = {"Origin": "http://127.0.0.1:9999", "Host": "127.0.0.1:8771", "Sec-Fetch-Site": "same-origin"}
+        self.assertEqual(self.post_with("/api/outbox/prepare", {"draft_id": draft}, mismatch), 403)
+        foreign = {"Origin": "http://evil.example:8771", "Host": "127.0.0.1:8771", "Sec-Fetch-Site": "same-origin"}
+        self.assertEqual(self.post_with("/api/outbox/prepare", {"draft_id": draft}, foreign), 403)
 
 
 class TransportTest(OutboxCase):

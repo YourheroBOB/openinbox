@@ -21,9 +21,10 @@ Life of a message:
   (`X-Unsent: 1`, so mail clients open it as an unsent message) and marked
   "awaiting the user to send it themselves". The transport seam
   (`_outbox_transport.py`) only has `disabled`, which never delivers.
-- A daemon ticker, started by the first outbox request (never at import, so scripts that
-  load the features do not get one), releases due messages while the server runs (set
-  OPENINBOX_OUTBOX_TICK=0 to turn it off); every outbox request also catches up.
+- A daemon ticker, started when the server process starts (never at import, so scripts
+  that load the features do not get one), releases due messages while the server runs
+  (set OPENINBOX_OUTBOX_TICK=0 to turn it off). POST routes also catch up. GET does not
+  release mail and does not start the ticker.
 - A message claimed for writing (`releasing`) and abandoned for over a minute (the process
   died) is recovered: marked ready if its .eml is complete, else queued again. The file name
   depends only on the message, so a retry never makes a second file.
@@ -52,9 +53,9 @@ from features import Raw, get, post
 from features import _outbox_transport as transport
 from features import compose
 
-AWAITING, UNDO, SCHEDULED, RELEASING, READY, DONE, CANCELLED = (
-    "awaiting_confirm", "undo_window", "scheduled", "releasing", "ready", "done", "cancelled")
-STATES = (AWAITING, UNDO, SCHEDULED, READY, DONE, CANCELLED)
+AWAITING, UNDO, SCHEDULED, RELEASING, READY, DONE, CANCELLED, BLOCKED = (
+    "awaiting_confirm", "undo_window", "scheduled", "releasing", "ready", "done", "cancelled", "blocked")
+STATES = (AWAITING, UNDO, SCHEDULED, READY, DONE, CANCELLED, BLOCKED)
 PENDING = (UNDO, SCHEDULED)
 UNDO_CHOICES = (5, 10, 20, 30)
 DEFAULT_SETTINGS = {"undo_seconds": 10, "transport": transport.DEFAULT}
@@ -67,6 +68,7 @@ RELEASE_STALE = 60
 PLACEHOLDER_RE = re.compile(r"\[(?:TBD|待填)\]", re.I)
 ATTACH_RE = re.compile(r"(\battach(?:ed|ment|ments|ing)?\b|\benclosed\b|附件|附檔|檢附|如附)", re.I)
 MSGID_RE = re.compile(r"^<[^<>@\s]+@[^<>@\s]+>$")
+HEADER_CTRL_RE = re.compile(r"[\r\n\x00]")
 
 STATE_LABELS = {
     AWAITING: ("待你確認", "Needs your confirmation"),
@@ -76,6 +78,7 @@ STATE_LABELS = {
     READY: ("待使用者自行寄出", "Awaiting you to send it yourself"),
     DONE: ("已由你自行寄出", "Sent by you"),
     CANCELLED: ("已取消", "Cancelled"),
+    BLOCKED: ("已擋下", "Blocked"),
 }
 
 _lock = threading.RLock()
@@ -148,6 +151,7 @@ def ensure_tables() -> None:
             account TEXT, to_addr TEXT, cc TEXT, bcc TEXT, subject TEXT, body TEXT, text TEXT,
             kind TEXT, source_id TEXT, in_reply_to TEXT, lang TEXT,
             digest TEXT,
+            draft_updated_at TEXT,
             token_hash TEXT, token_expires REAL,
             mode TEXT, release_ts REAL, release_at TEXT, proposed_at TEXT,
             confirmed_at TEXT, confirmed_by TEXT,
@@ -164,6 +168,9 @@ def ensure_tables() -> None:
         CREATE INDEX IF NOT EXISTS idx_outbox_log_item ON outbox_log(outbox_id);
         """
     )
+    cols = {r[1] for r in con.execute("PRAGMA table_info(outbox)")}
+    if "draft_updated_at" not in cols:
+        con.execute("ALTER TABLE outbox ADD COLUMN draft_updated_at TEXT")
     con.commit()
     con.close()
     _ensured.add(str(yhbmail.DB))
@@ -300,8 +307,27 @@ def _addrs(value: str) -> list[str]:
     return compose.split_addrs(value or "")
 
 
-def address_errors(fields: dict, zh: bool) -> list[str]:
+def _header_control_errors(fields: dict, zh: bool) -> list[str]:
+    """Subject, From, and display names cannot carry CR, LF or NUL. Those bytes make
+    EmailMessage raise, and a release that keeps retrying them spins the ticker."""
     errs = []
+    if HEADER_CTRL_RE.search(fields.get("subject") or ""):
+        errs.append(_msg(zh, "主旨不能含換行", "the subject cannot contain a line break"))
+    if HEADER_CTRL_RE.search(fields.get("account") or ""):
+        errs.append(_msg(zh, "寄件帳號不能含換行", "the From account cannot contain a line break"))
+    for key in ("to_addr", "cc", "bcc"):
+        for a in _addrs(fields.get(key)):
+            name, addr = compose.parse_addr(a)
+            if HEADER_CTRL_RE.search(name) or HEADER_CTRL_RE.search(addr):
+                label = key.replace("_addr", "")
+                errs.append(_msg(zh, f"{label} 的顯示名稱或位址不能含換行",
+                                 f"{label}: the display name or address cannot contain a line break"))
+                break
+    return errs
+
+
+def address_errors(fields: dict, zh: bool) -> list[str]:
+    errs = _header_control_errors(fields, zh)
     if not _addrs(fields.get("to_addr")):
         errs.append(_msg(zh, "至少要有一位收件者", "add at least one recipient"))
     total = 0
@@ -445,6 +471,7 @@ def _fields_from_draft(draft_id) -> dict | None:
     view = compose.draft_view(raw)
     return {
         "draft_id": draft_id, "draft_json": json.dumps(raw, ensure_ascii=False),
+        "draft_updated_at": raw.get("updated_at") or "",
         "account": view["account"] or "you@example.com", "to_addr": view["to"], "cc": view["cc"],
         "bcc": view["bcc"], "subject": view["subject"], "body": view["body"], "text": view["text"],
         "kind": view["kind"], "source_id": view["source_id"], "in_reply_to": view["in_reply_to"],
@@ -459,7 +486,7 @@ def _fields_from_body(data: dict, lang: str) -> dict:
     quote = clip(data.get("quote"), 100_000)
     source_id = clip(data.get("source_id") or data.get("in_reply_to"), 300)
     return {
-        "draft_id": None, "draft_json": "",
+        "draft_id": None, "draft_json": "", "draft_updated_at": "",
         "account": clip(data.get("account") or "you@example.com", 300), "to_addr": clip(data.get("to"), 2000),
         "cc": clip(data.get("cc"), 2000), "bcc": clip(data.get("bcc"), 2000), "subject": clip(data.get("subject"), 500),
         "body": compose.compose_body(text, quote), "text": text, "kind": kind, "source_id": source_id,
@@ -506,13 +533,25 @@ def restore_draft(row: dict) -> int:
     return int(fields.get("id") or new_id)
 
 
-def _delete_draft(draft_id) -> None:
+def _digest_of_draft(raw: dict) -> str:
+    view = compose.draft_view(raw)
+    return digest({
+        "account": view["account"] or "you@example.com", "to_addr": view["to"], "cc": view["cc"],
+        "bcc": view["bcc"], "subject": view["subject"], "body": view["body"],
+    })
+
+
+def _draft_still_snapshot(con, row: dict) -> bool:
+    """The live draft must still be the one that was previewed. Missing, retouched, or rewritten → False."""
+    draft_id = row.get("draft_id")
     if not draft_id:
-        return
-    con = yhbmail.db()
-    con.execute("DELETE FROM drafts WHERE id=?", (int(draft_id),))
-    con.commit()
-    con.close()
+        return True
+    current = con.execute("SELECT * FROM drafts WHERE id=?", (int(draft_id),)).fetchone()
+    if not current:
+        return False
+    if (current["updated_at"] or "") != (row.get("draft_updated_at") or ""):
+        return False
+    return _digest_of_draft(dict(current)) == (row.get("digest") or "")
 
 
 # ───────────────────────── prepare / confirm ─────────────────────────
@@ -543,10 +582,11 @@ def prepare(data: dict, lang: str, created_by: str = "user") -> tuple[dict, int]
                 con.execute("UPDATE outbox SET state=?, cancelled_at=?, cancel_reason='superseded', updated_at=? "
                             "WHERE id=?", (CANCELLED, now, now, old["id"]))
                 _log(con, old["id"], "superseded", created_by)
-        cols = ("state", "created_by", "draft_id", "draft_json", "account", "to_addr", "cc", "bcc", "subject",
-                "body", "text", "kind", "source_id", "in_reply_to", "lang", "digest", "token_hash",
+        cols = ("state", "created_by", "draft_id", "draft_json", "draft_updated_at", "account", "to_addr", "cc",
+                "bcc", "subject", "body", "text", "kind", "source_id", "in_reply_to", "lang", "digest", "token_hash",
                 "token_expires", "proposed_at", "note", "created_at", "updated_at")
-        vals = (AWAITING, created_by, fields["draft_id"], fields["draft_json"], fields["account"], fields["to_addr"],
+        vals = (AWAITING, created_by, fields["draft_id"], fields["draft_json"], fields.get("draft_updated_at") or "",
+                fields["account"], fields["to_addr"],
                 fields["cc"], fields["bcc"], fields["subject"], fields["body"], fields["text"], fields["kind"],
                 fields["source_id"], fields["in_reply_to"], fields["lang"], digest(fields),
                 _hash_token(token) if token else "", now_dt().timestamp() + TOKEN_TTL if token else None,
@@ -628,17 +668,33 @@ def confirm(data: dict, lang: str, now: datetime | None = None) -> tuple[dict, i
     stamp = _iso(now)
     with _lock:
         con = yhbmail.db()
+        fresh = con.execute("SELECT * FROM outbox WHERE id=? AND state=?", (row["id"], AWAITING)).fetchone()
+        if not fresh or not _draft_still_snapshot(con, dict(fresh)):
+            con.close()
+            return _bad(zh, "草稿在預覽之後改過或已不在，請重新檢視。這次沒有刪除草稿，也沒有排程。",
+                        "the draft changed or is gone since the preview; review it again. "
+                        "The draft was not deleted and nothing was scheduled.", 409)
+        fresh = dict(fresh)
         n = con.execute(
             "UPDATE outbox SET state=?, mode=?, release_ts=?, release_at=?, confirmed_at=?, confirmed_by='user', "
             "token_hash='', token_expires=NULL, updated_at=? WHERE id=? AND state=?",
             (state, mode, release.timestamp(), _iso(release), stamp, stamp, row["id"], AWAITING)).rowcount
         if not n:
+            con.rollback()
             con.close()
             return _bad(zh, "這封信已經不在待確認狀態", "this message is no longer waiting for confirmation", 409)
+        draft_id = fresh.get("draft_id")
+        if draft_id:
+            deleted = con.execute("DELETE FROM drafts WHERE id=? AND COALESCE(updated_at, '')=?",
+                                  (int(draft_id), fresh.get("draft_updated_at") or "")).rowcount
+            if not deleted:
+                con.rollback()
+                con.close()
+                return _bad(zh, "草稿在確認當下被改掉了，已取消這次排程。請重新檢視。",
+                            "the draft changed during confirmation, so this was rolled back. Review it again.", 409)
         _log(con, row["id"], "confirmed", "user", f"{mode} {_iso(release)}")
         con.commit()
         con.close()
-        _delete_draft(row.get("draft_id"))
     item = item_view(_row(row["id"]), lang, now)
     if state == UNDO:
         note = _msg(zh, f"已排入寄件匣：{item['seconds_left']:.0f} 秒內可以撤回，之後寫成 .eml 待你自行寄出。",
@@ -861,6 +917,20 @@ def _release(outbox_id: int, now: datetime) -> dict | None:
             if not n:
                 _drop_orphan(outbox_id, path)
                 return None
+        except (ValueError, UnicodeError) as e:
+            # Header injection or a bad address: do not put it back on the ticker.
+            con = yhbmail.db()
+            con.execute("UPDATE outbox SET state=?, release_ts=NULL, release_at='', note=?, updated_at=? "
+                        "WHERE id=? AND state=?",
+                        (BLOCKED, type(e).__name__, _iso(now), outbox_id, RELEASING))
+            _log(con, outbox_id, "release_blocked", "system", type(e).__name__)
+            con.commit()
+            con.close()
+            if path is not None:
+                path.with_suffix(".eml.tmp").unlink(missing_ok=True)
+                if path.is_file():
+                    path.unlink()
+            return None
         except Exception as e:
             con = yhbmail.db()
             con.execute("UPDATE outbox SET state=?, note=?, updated_at=? WHERE id=? AND state=?",
@@ -985,7 +1055,8 @@ AGENT_TOOLS = [
                     "提議一封信進寄件匣，必須由使用者在介面親自確認；agent 不能確認、排程或寄出。"},
     {"name": "outbox_list",
      "description": "List outbox messages. Args: state (awaiting_confirm, undo_window, scheduled, ready, done, "
-                    "cancelled, all). 列出寄件匣與排程的信。"},
+                    "cancelled, blocked, all). The model does not receive the body or Bcc. "
+                    "列出寄件匣與排程的信；不回正文與密件副本。"},
 ]
 
 
@@ -1010,7 +1081,7 @@ def _install_agent_tools() -> None:
         if name == "outbox_list":
             state = args.get("state") or "all"
             states = None if state == "all" else [s for s in str(state).split(",") if s in STATES]
-            return {"items": [{k: v for k, v in x.items() if k not in ("body",)}
+            return {"items": [{k: v for k, v in x.items() if k not in ("body", "bcc")}
                               for x in list_items(states, lang, 100)]}
         return core(name, args)
 
@@ -1023,8 +1094,27 @@ _install_agent_tools()
 
 # ───────────────────────── routes ─────────────────────────
 
+def _host_port(handler) -> int | None:
+    """Port the browser used, from the Host header. An ssh -L 8771 forward sends Host :8771
+    even when this process is bound to 8770."""
+    host = (handler.headers.get("Host") or "").strip()
+    if host.startswith("["):
+        end = host.find("]")
+        rest = host[end + 1:] if end >= 0 else ""
+        if rest.startswith(":") and rest[1:].isdigit():
+            return int(rest[1:])
+        return None
+    if ":" in host:
+        maybe = host.rsplit(":", 1)[-1]
+        if maybe.isdigit():
+            return int(maybe)
+    return None
+
+
 def _human_origin(req) -> bool:
-    """Refuse other web pages: no Origin (scripts) or this app's own origin; browsers' fetch metadata must agree."""
+    """Refuse other web pages. No Origin (curl, tests) is allowed. A browser Origin must be
+    http://127.0.0.1 or http://localhost, and its port must match the request Host port
+    (the port the user opened), not the port this process bound."""
     handler = req.handler
     if handler is None:
         return True
@@ -1034,22 +1124,30 @@ def _human_origin(req) -> bool:
     origin = handler.headers.get("Origin")
     if origin is None:
         return True
-    try:
-        port = handler.server.server_address[1]
-    except (AttributeError, IndexError, TypeError):
-        port = int(os.environ.get("OPENINBOX_PORT", "8770"))
-    return origin.strip().lower().rstrip("/") in (f"http://127.0.0.1:{port}", f"http://localhost:{port}")
+    from urllib.parse import urlsplit
+    parts = urlsplit(origin.strip().rstrip("/"))
+    if parts.scheme != "http" or parts.hostname not in ("127.0.0.1", "localhost"):
+        return False
+    origin_port = parts.port or 80
+    host_port = _host_port(handler)
+    if host_port is None:
+        try:
+            host_port = handler.server.server_address[1]
+        except (AttributeError, IndexError, TypeError):
+            host_port = int(os.environ.get("OPENINBOX_PORT", "8770"))
+    return origin_port == host_port
 
 
 def _guard(fn=None, catch_up: bool = True):
-    """Every outbox route: refuse foreign pages on POST, keep the ticker alive, release what is due first."""
+    """Every outbox route: same-origin for GET and POST. GET does not release mail or start the ticker."""
     def deco(fn):
         def wrapped(req):
-            start_ticker()
-            if req.method == "POST" and not _human_origin(req):
+            if req.method != "GET":
+                start_ticker()
+            if not _human_origin(req):
                 return _bad(req.lang_zh(), "拒絕跨來源請求：請從本機 App 介面操作",
                             "cross-origin request refused: use the app itself", 403)
-            if catch_up:
+            if catch_up and req.method != "GET":
                 release_due()
             return fn(req)
         wrapped.__name__ = fn.__name__

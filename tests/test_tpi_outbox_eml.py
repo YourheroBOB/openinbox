@@ -8,7 +8,7 @@ from email.policy import default as default_policy
 from unittest import mock
 
 import _tpi_server as srv
-from _tpi_outbox_util import OutboxCase, at
+from _tpi_outbox_util import OutboxCase, at, make_draft
 from features import outbox
 
 
@@ -74,6 +74,30 @@ class EmlTest(OutboxCase):
     def test_no_download_before_release(self):
         item = self.confirmed("schedule", send_at=at(2).isoformat())
         self.assertEqual(srv.request("GET", f"/api/outbox/eml/{item['id']}.eml")[0], 404)
+
+    def test_newline_subject_is_refused_before_confirm(self):
+        out, status = outbox.prepare({"draft_id": make_draft(subject="Hello\nBcc: leak@example.com")}, "en")
+        self.assertEqual(status, 400, out)
+        out, status = outbox.prepare({"draft_id": make_draft(to="\"Bad\nName\" <maya@example.com>")}, "en")
+        self.assertEqual(status, 400, out)
+        self.assertEqual(outbox.release_due(at(24 * 400)), [])
+
+    def test_newline_subject_blocks_once_and_does_not_retry(self):
+        item = self.confirmed("now")
+        con = srv.yhbmail.db()
+        con.execute("UPDATE outbox SET subject=?, release_ts=? WHERE id=?",
+                    ("Hello\nBcc: leak@example.com", outbox.now_dt().timestamp() - 1, item["id"]))
+        con.commit()
+        con.close()
+        with mock.patch("sys.stderr"):
+            self.assertEqual(outbox.release_due(), [])
+        row = outbox._row(item["id"])
+        self.assertEqual(row["state"], "blocked")
+        self.assertIsNone(row["release_ts"])
+        self.assertEqual(row["note"], "ValueError")
+        self.assertNotIn("leak@example.com", row["note"])
+        self.assertEqual(outbox.release_due(), [])
+        self.assertEqual(list(outbox.outbox_dir().glob("*.eml")) if outbox.outbox_dir().exists() else [], [])
 
     def test_write_failure_keeps_the_message_queued(self):
         item = self.confirmed("now")
