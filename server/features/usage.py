@@ -344,6 +344,9 @@ def _int(value, default: int, lo: int = 1, hi: int = 3650) -> int:
 
 @get("/api/usage")
 def usage_report(req):
+    from features._origin import local_read, refuse
+    if not local_read(req):
+        return refuse(req.lang_zh())
     return report(_int(req.query.get("days"), 30), _int(req.query.get("limit"), 50, hi=500),
                   "zh-Hant" if req.lang_zh() else "en")
 

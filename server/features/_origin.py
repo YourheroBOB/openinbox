@@ -20,6 +20,16 @@ def local_origin(req) -> bool:
     return origin.strip().lower().rstrip("/") in (f"http://127.0.0.1:{port}", f"http://localhost:{port}")
 
 
+def local_read(req) -> bool:
+    """Same as local_origin, and a browser cross-site fetch is refused even when Origin is absent."""
+    handler = getattr(req, "handler", None)
+    if handler is not None:
+        site = handler.headers.get("Sec-Fetch-Site")
+        if site and site.lower() == "cross-site":
+            return False
+    return local_origin(req)
+
+
 def refuse(zh: bool) -> tuple[dict, int]:
     msg = "拒絕跨來源請求：請從本機 App 介面操作" if zh else "cross-origin request refused: use this app's own UI"
     return {"error": msg}, 403
