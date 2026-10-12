@@ -1,9 +1,11 @@
 """F18: Schedule Send queue and the Scheduled folder (change time, edit back to Drafts, cancel)."""
 from __future__ import annotations
 
+import os
 import time
 import unittest
 from datetime import datetime, timedelta
+from unittest import mock
 
 import _tpi_server as srv
 from _tpi_outbox_util import OutboxCase, at, make_draft
@@ -151,6 +153,24 @@ class ScheduleTest(OutboxCase):
                 break
             time.sleep(0.1)
         self.assertEqual(outbox._row(item["id"])["state"], "ready")
+
+    def test_process_start_releases_without_an_outbox_request(self):
+        item = self.confirmed("schedule", send_at=at(2).isoformat())
+        con = srv.yhbmail.db()
+        con.execute("UPDATE outbox SET release_ts=? WHERE id=?", (time.time() - 1, item["id"]))
+        con.commit()
+        con.close()
+        outbox._ticker["off"] = False
+        import app
+        with mock.patch.dict(os.environ, {"OPENINBOX_OUTBOX_TICK": "1"}):
+            app.start_background()
+        self.addCleanup(outbox.stop_ticker)
+        for _ in range(50):
+            if outbox._row(item["id"])["state"] == "ready":
+                break
+            time.sleep(0.1)
+        self.assertEqual(outbox._row(item["id"])["state"], "ready")
+        self.assertIsNotNone(outbox._ticker["thread"])
 
 
 class ScheduledHttpTest(OutboxCase):

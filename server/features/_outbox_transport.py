@@ -8,6 +8,10 @@ This file is the seam, not an invitation: there is no network, socket or mail
 protocol code here, and `get()` refuses any name that is not registered. A
 transport's `deliver()` is only ever called when `enabled` is True, and the
 outbox never calls it for a message the user has not confirmed.
+
+The released `.eml` keeps `Bcc` and `X-Unsent: 1` so the user can open it in a mail
+client. A later transport that hands those bytes to SMTP must strip `Bcc` first;
+sending the file as stored would leak blind-copy recipients.
 """
 from __future__ import annotations
 
