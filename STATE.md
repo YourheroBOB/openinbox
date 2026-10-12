@@ -2,8 +2,8 @@
 
 goal: 功能 100% 對齊 Genspark GenMail（BYOK、本機優先、不寄信）
 status: doing
-next: GB1 orchestrator 依序派工，未完成 WP：tpi-skills、tpi-outbox、tpi-agents、tpi-mobile
-parity: 29/38（76%）　更新：2026-10-12 00:15 (UTC+8)
+next: GB1 orchestrator 依序派工，未完成 WP：tpi-skills、tpi-outbox、tpi-agents
+parity: 30/38（79%）　更新：2026-10-12 08:15 (UTC+8)
 
 ## 運作方式
 - 正本在 GitHub；GB1 `/workspace/cursor-runs/parity/orchestrate.py` 每 15 分鐘依 work package（WP）派 `run_loop.sh`（最多 4 個平行、分支 `agent/<wp>`、各自狀態檔 `state/<wp>.md`）。
@@ -50,7 +50,7 @@ parity: 29/38（76%）　更新：2026-10-12 00:15 (UTC+8)
 | F33 | GenTeam：寄信／@ 提及 agent 進 thread、成果卡片預覽 | todo | tpi-agents | 單元測試：@agent 觸發、deliverable card API |
 | F34 | Agent 連接器：MCP 伺服器（stdio JSON-RPC）提供 inbox 工具 | done | tpi-mcp | 單元測試：initialize／tools/list／tools/call |
 | F35 | 用量／點數頁 → BYOK token 用量紀錄 | blocked | tpi-skills | 單元測試：usage jsonl 記錄與 /api/usage |
-| F36 | Mac／Windows／iOS／Android → 可安裝 PWA＋行動版版面 | doing | tpi-mobile | smoke：manifest、service worker、窄螢幕版面 |
+| F36 | Mac／Windows／iOS／Android → 可安裝 PWA＋行動版版面 | done | tpi-mobile | smoke：manifest、service worker、窄螢幕版面 |
 | F37 | 隱私：信件留在信箱供應商；本機快取可清除；不經第三方伺服器 | done | tpi-foundation | README 說明＋單元測試：/api/cache/clear |
 | F38 | Linux／雲端主機可跑（tests＋smoke 綠燈、雲端執行說明） | done | tpi-foundation | scripts/smoke.sh＋CI unittest 綠燈 |
 
@@ -76,16 +76,13 @@ parity: 29/38（76%）　更新：2026-10-12 00:15 (UTC+8)
 | tpi-outbox | needs-bob | tpi-compose | 2 | https://github.com/YourheroBOB/openinbox/pull/22 |
 | tpi-followup | merged | tpi-triage | 2 | https://github.com/YourheroBOB/openinbox/pull/20 |
 | tpi-agents | pending | tpi-skills | 0 | - |
-| tpi-mobile | running | tpi-mailops | 2 | - |
+| tpi-mobile | merged | tpi-mailops | 2 | https://github.com/YourheroBOB/openinbox/pull/25 |
 
 ## 來源卡片
 - Linear HQ-1173：土炮 GenMail MVP（openinbox＋gsk 驅動＋BYOK，本機 8788 埠）。
 - Linear HQ-1299：v2.0（分類器升級、歷史回填、情報雷達、MCP 伺服器）— YHB 專屬部分已移到私有 yhb-mail；通用 MCP 伺服器在本 repo 由 tpi-mcp 實作。
 
 ## log
-- [2026-10-11 22:15:05] defer launch: GB1 MemAvailable 2.3G < 3.5G
-- [2026-10-11 22:15:05] defer launch: GB1 MemAvailable 2.3G < 3.5G
-- [2026-10-11 22:15:08] STATE sync PR https://github.com/YourheroBOB/openinbox/pull/18
 - [2026-10-11 22:30:03] tpi-calendar merged https://github.com/YourheroBOB/openinbox/pull/16
 - [2026-10-11 22:30:05] launch tpi-mailops attempt 2 (r) log=/workspace/cursor-runs/tpi-mailops-r2.log
 - [2026-10-11 22:30:07] launch tpi-outbox attempt 1 (a) log=/workspace/cursor-runs/tpi-outbox-a1.log
@@ -103,3 +100,6 @@ parity: 29/38（76%）　更新：2026-10-12 00:15 (UTC+8)
 - [2026-10-11 23:46:16] STATE sync PR https://github.com/YourheroBOB/openinbox/pull/23
 - [2026-10-12 00:00:03] tpi-followup merged https://github.com/YourheroBOB/openinbox/pull/20
 - [2026-10-12 00:00:05] launch tpi-mobile attempt 2 (r) log=/workspace/cursor-runs/tpi-mobile-r2.log
+- [2026-10-12 00:15:07] STATE sync PR https://github.com/YourheroBOB/openinbox/pull/24
+- [2026-10-12 08:01:46] tpi-mobile remote test auto 1ddf2ac: pass
+- [2026-10-12 08:15:03] tpi-mobile merged https://github.com/YourheroBOB/openinbox/pull/25
