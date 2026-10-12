@@ -103,3 +103,4 @@ parity: 38/38（100%）　更新：2026-10-12 22:55 (UTC+8)
 - [2026-10-12 22:45:10] STATE sync PR https://github.com/YourheroBOB/openinbox/pull/35
 - [2026-10-12 22:55:18] tpi-skills merged https://github.com/YourheroBOB/openinbox/pull/27
 - [2026-10-12 22:55:22] state-sync 修審查（PR #35 第 1 輪）：orchestrate.py 合併判斷改以 origin/main 為準（MERGED PR 含替代分支 agent/<wp>-*，merge commit 須在 main；後備認 main 上 agent/<wp>: squash commit），重產 STATE.md → tpi-skills merged #27、38/38；驗證：離線案例＋dry-run、unittest 711 OK、smoke OK（隨機 port）
+- [2026-10-12 22:59:30] review pass（PR #35 第 1 輪驗收）：四點皆成立——F09/F10/F35 done（main 9bd2215 含 server/features/skills.py、usage.py、tests/test_tpi_skills_*）、tpi-skills merged #27、parity 38/38、orchestrate.py 依 origin/main 判斷合併；小修：後備 squash 標題比對允許無 agent/ 前綴（原漏認 #11「tpi-search:」）；驗證：unittest 711 OK、test_tpi_skills_* 75 OK、smoke OK（隨機 port 58355）、--status 與本檔一致、merged_wps 離線案例（主判斷 14／僅後備 14／非 main PR 不認／needs-bob→merged #27）＋--dry-run OK
