@@ -60,6 +60,11 @@ parity: 30/38（79%）　更新：2026-10-12 08:15 (UTC+8)
 - Second Brain 卡片、Know-you-better persona、BYO agent（local／OpenAI 相容／CLI／HTTP）、/api/v1 工具 API
 - 繁中／英文介面；送信預設關閉
 
+## 分支 agent/tpi-skills-r2（PR #27 修正輪）
+status: done
+next: 等 GB1 pipeline 重跑本地 CI＋AI 審查（已 commit、未 push）。多模型複審（gpt-6-astra）另列的後續項目未在本輪處理：①投影片清單／檔案與 CRM 的 GET 加來源檢查（目前帶 CORS *）②會前準備改用統一行事曆資料（local:／sync: ID）③技能讀信遵守 mail_state、排除永久刪除的信。
+- [2026-10-12 13:20 +08] PR #27 審查第 1/3 輪：本地 CI @claw step3 失敗的根因是審查管線寫進 PR checkout 的 `.pr-review/diff.patch` 被當成 repo 檔同步到節點，`test_only_example_addresses` 把 diff 新增行（行首 `+` 緊接 `@contextlib.contextmanager` 裝飾器）讀成 email；`.gitignore` 加 `.pr-review/`，該目錄不再被 `git ls-files -co --exclude-standard` 列出、也不再同步到 CI 節點。驗證：暫存 clone 放入與管線相同的 `.pr-review/`（diff.patch、wf_smoke.yml、pr_text.txt），修正前「有 git」與「無 .git 的節點副本」兩條路徑皆重現同一失敗，修正後皆通過；同一 clone 跑 `SMOKE_PORT=<隨機空 port> bash scripts/smoke.sh` 5 步全過（561 OK）；repo 內 `python3 -m unittest discover -s tests` 561 OK。
+
 ## WP 狀態
 | WP | 狀態 | 依賴 | 嘗試 | PR |
 |---|---|---|---|---|
