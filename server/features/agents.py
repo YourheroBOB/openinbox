@@ -39,6 +39,7 @@ MENTIONS = {
     "meeting": "meeting_prep",
 }
 MENTION_RE = re.compile(r"(?<![\w.])@(agent|research-company|research|prep|meeting)\b", re.I)
+_HTTP_STATUS_RE = re.compile(r"\bHTTP (\d{3})\b")
 COMPANY_WORDS = re.compile(r"(公司|company|corp|inc|ltd|co\.|股份|有限)", re.I)
 # Polite request words stripped from the start/end of a mention target, so "@agent 請幫我查 X" targets X.
 REQUEST_VERBS = re.compile(
@@ -111,8 +112,15 @@ def parse_mention(text: str) -> dict | None:
 
 
 def mentions_alias(to_addr: str) -> bool:
-    """True when a recipient line names the agent alias. Routing check only, never delivery."""
-    return ALIAS in (to_addr or "").lower()
+    """True when a recipient addr-spec is exactly the agent alias. Routing check only, never delivery.
+
+    A longer local-part or an extra label after the domain is not the alias.
+    """
+    from features.compose import parse_addr, split_addrs
+    for part in split_addrs(to_addr or ""):
+        if parse_addr(part)[1].strip().lower() == ALIAS:
+            return True
+    return False
 
 
 # ───────────────────────── context ─────────────────────────
@@ -198,6 +206,17 @@ def _local_brief(pack: dict) -> str:
     return "\n".join(lines)
 
 
+def error_label(exc: BaseException) -> str:
+    """Exception class, plus an HTTP status when the message names one. Never the message itself:
+    agent_bridge errors can include the endpoint body or a CLI stderr echo of the prompt."""
+    label = type(exc).__name__
+    code = getattr(exc, "code", None)
+    if not isinstance(code, int):
+        m = _HTTP_STATUS_RE.search(str(exc))
+        code = int(m.group(1)) if m else None
+    return f"{label}: HTTP {code}" if code is not None else label
+
+
 def run_task(kind: str, target: str, ask: str = "", lang: str = "en", thread: dict | None = None) -> dict:
     """Run one agent task through the bridge. Falls back to the local heuristic on any failure.
     `thread` is a cached message the mention was made in; it leads the sources."""
@@ -218,7 +237,7 @@ def run_task(kind: str, target: str, ask: str = "", lang: str = "en", thread: di
         else:
             used, fallback = "local", True
     except Exception as e:
-        error, used, fallback = str(e)[:300], "local", True
+        error, used, fallback = error_label(e), "local", True
     if not text:
         used, fallback = "local", True
         text = _local_brief(pack)
@@ -403,6 +422,8 @@ def mention(req):
 
 @get("/api/agents/deliverables")
 def deliverables(req):
+    if not local_origin(req):
+        return refuse(req.lang_zh())
     try:
         limit = max(1, min(int(req.query.get("limit") or 50), 200))
     except ValueError:
@@ -412,6 +433,8 @@ def deliverables(req):
 
 @get("/api/agents/deliverables/*")
 def deliverable(req):
+    if not local_origin(req):
+        return refuse(req.lang_zh())
     raw = req.params.lstrip("/")
     did, _, fmt = raw.partition(".")
     got = read_deliverable(did, fmt or "md")
