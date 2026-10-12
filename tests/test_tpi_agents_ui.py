@@ -52,6 +52,12 @@ class UiModuleTest(unittest.TestCase):
     def test_nav_entry_and_no_core_edits_needed(self):
         self.assertIn('dataset.view = "agents"', MODULE.read_text())
 
+    def test_open_thread_gets_an_agent_button(self):
+        src = MODULE.read_text()
+        self.assertIn("window.openThread = async", src, "the reader is wrapped, not edited")
+        self.assertIn("email_id: id", src, "a thread mention carries the open message")
+        self.assertRegex(src, r"\bthreadBtn:")
+
 
 class RepoRulesTest(unittest.TestCase):
     """Hard rules from the task brief, checked against this feature's own files."""

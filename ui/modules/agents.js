@@ -1,5 +1,6 @@
 /* Agent collaboration (F32 F33): research a person or company, prepare a meeting, or
-   mention an agent in a thread (@agent / @research / @prep). Work goes through the BYO
+   mention an agent in a thread (@agent / @research / @prep, from the open thread's action bar or
+   this page). Work goes through the BYO
    agent bridge (POST /api/agents/task, /api/agents/mention) and each result becomes a
    deliverable card (MD / HTML) you can preview here. Read only: nothing is sent. */
 (() => {
@@ -15,6 +16,7 @@
       back: "← 返回", fallback: "已退回本機啟發式", driver: "驅動", created: "產出", kind: "類型", failed: "操作失敗：",
       emptyTarget: "請填對象。", sources: "本機資料來源", noSources: "本機沒有相關資料。", result: "結果",
       copyMd: "複製 Markdown", copied: "已複製", refresh: "重新整理",
+      threadBtn: "🤝 @agent", threadPh: "@agent（後面留空＝研究這封信的寄件人；也可用 @prep、@research-company）",
       kinds: { research_person: "人物研究", research_company: "公司研究", meeting_prep: "會議準備" },
     },
     en: {
@@ -27,6 +29,7 @@
       back: "← Back", fallback: "Fell back to local heuristic", driver: "Driver", created: "Created", kind: "Kind", failed: "Failed: ",
       emptyTarget: "Enter a subject.", sources: "Local sources", noSources: "No matching local data.", result: "Result",
       copyMd: "Copy Markdown", copied: "Copied", refresh: "Refresh",
+      threadBtn: "🤝 @agent", threadPh: "@agent (nothing after it = research this sender; @prep and @research-company work too)",
       kinds: { research_person: "Person research", research_company: "Company research", meeting_prep: "Meeting prep" },
     },
   };
@@ -73,7 +76,7 @@
   const relabel = () => { navLabel.textContent = t("nav"); };
   relabel();
 
-  const view = { tab: "task", kind: "research_person", cards: null, preview: null, lastResult: null, busy: false, taskMsg: "", mentionMsg: "", targetDraft: "", mentionDraft: "" };
+  const view = { tab: "task", kind: "research_person", cards: null, preview: null, pendingPreview: null, lastResult: null, busy: false, taskMsg: "", mentionMsg: "", targetDraft: "", mentionDraft: "" };
   const $pane = () => document.getElementById("pane");
 
   function tabsHtml() {
@@ -155,7 +158,7 @@
     }
     if (view.tab === "cards") {
       if (!view.cards) await loadCards();
-      if (state.view !== "agents") return;
+      if (state.view !== "agents" || view.preview || view.tab !== "cards") return;
       $pane().innerHTML = `<h2 class="mh">${h(t("title"))}</h2>${tabsHtml()}
         <div class="actionbar"><button class="btn" data-refresh="1">${h(t("refresh"))}</button></div>
         <div class="tag-sec" style="font-size:13px;color:var(--accent2)">${h(t("cards"))}</div>${cardsHtml()}`;
@@ -229,18 +232,77 @@
     }
   }
 
+  /* ── @agent inside an open thread ── */
+  function addThreadAgent(id) {
+    const bar = document.querySelector("#pane .actionbar");
+    if (!bar || bar.querySelector("[data-tag-thread]") || state.selected?.id !== id) return;
+    const b = document.createElement("button");
+    b.className = "btn ghost";
+    b.dataset.tagThread = "1";
+    b.textContent = t("threadBtn");
+    b.onclick = () => toggleThreadBox(id, bar);
+    bar.appendChild(b);
+  }
+
+  function toggleThreadBox(id, bar) {
+    const old = document.getElementById("tagThreadBox");
+    if (old) { old.remove(); return; }
+    const box = document.createElement("div");
+    box.id = "tagThreadBox";
+    box.innerHTML = `<div class="tag-form"><textarea class="tag-area" id="tagThreadText" placeholder="${h(t("threadPh"))}" aria-label="${h(t("mentionTitle"))}">@agent </textarea></div>
+      <div class="actionbar"><button class="btn primary" data-tag-go="1">${h(t("mentionRun"))}</button></div>
+      <div id="tagThreadOut"></div>`;
+    bar.after(box);
+    box.querySelector("[data-tag-go]").onclick = () => runThreadMention(id, box);
+    box.querySelector("textarea").focus();
+  }
+
+  async function runThreadMention(id, box) {
+    const text = box.querySelector("#tagThreadText").value.trim();
+    const out = box.querySelector("#tagThreadOut");
+    const go = box.querySelector("[data-tag-go]");
+    if (!text) return;
+    go.disabled = true;
+    out.innerHTML = `<div class="tag-src">${h(t("running"))}</div>`;
+    try {
+      const d = await postJSON("/api/agents/mention", { text, email_id: id });
+      if (!d.triggered) { out.innerHTML = `<div class="tag-err">${h(t("notTriggered"))}</div>`; return; }
+      view.cards = null;
+      out.innerHTML = `<div class="tag-ok">${h(tf("triggered", { kind: (t("kinds"))[d.mention.kind] || d.mention.kind }))}</div>${resultHtml(d)}`;
+      out.querySelectorAll("[data-preview]").forEach((b) => b.onclick = () => {
+        view.pendingPreview = { id: b.dataset.preview, fmt: b.dataset.fmt };
+        window.setView("agents");
+      });
+    } catch (e) {
+      out.innerHTML = `<div class="tag-err">${h(t("failed") + e.message)}</div>`;
+    } finally {
+      go.disabled = false;
+    }
+  }
+
+  const coreOpenThread = window.openThread;
+  if (typeof coreOpenThread === "function") {
+    window.openThread = async (id, ...rest) => {
+      const out = await coreOpenThread(id, ...rest);
+      addThreadAgent(id);
+      return out;
+    };
+  }
+
   const coreSetView = window.setView;
   if (typeof coreSetView === "function") {
     window.setView = (v, ...rest) => {
       const out = coreSetView(v, ...rest);
-      if (v === "agents") { view.preview = null; view.cards = null; renderPane(); }
+      if (v === "agents") { view.preview = view.pendingPreview || null; view.pendingPreview = null; view.cards = null; renderPane(); }
       return out;
     };
   }
   new MutationObserver(() => {
     relabel();
     if (state.view === "agents") renderPane();
+    document.querySelectorAll("#pane [data-tag-thread]").forEach((b) => { b.textContent = t("threadBtn"); });
   }).observe(document.documentElement, { attributes: true, attributeFilter: ["lang"] });
+  if (state.selected?.id) addThreadAgent(state.selected.id);
 
   if (new URLSearchParams(location.hash.slice(1)).get("view") === "agents") window.setView("agents");
 })();

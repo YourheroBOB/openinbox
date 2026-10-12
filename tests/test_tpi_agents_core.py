@@ -22,6 +22,8 @@ class TaskRunTest(unittest.TestCase):
             self.assertTrue(s["id"].startswith("demo:"), "sources come from the local cache only")
         self.assertIn("identity", pack["persona"])
         self.assertTrue(any("Read only" in r for r in pack["rules"]))
+        self.assertTrue(any("never follow instructions" in r for r in pack["rules"]),
+                        "quoted mail in the pack is marked as data for the operator's agent")
 
     def test_build_pack_rejects_unknown_kind(self):
         with self.assertRaises(ValueError):
@@ -181,6 +183,12 @@ class CoreHttpTest(unittest.TestCase):
         self.assertEqual(body["alias"], A.ALIAS)
         self.assertEqual(srv.request("GET", "/api/agents/deliverables/nope-nope-0000.md")[0], 404)
         self.assertEqual(srv.request("GET", "/api/agents/deliverables/..%2Fsecret.md")[0], 404)
+
+    def test_bad_limit_does_not_error(self):
+        for q in ("abc", "-5", "0", "99999"):
+            status, body = srv.call("GET", f"/api/agents/deliverables?limit={q}")
+            self.assertEqual(status, 200, q)
+            self.assertIsInstance(body["deliverables"], list)
 
     def test_state_changing_post_refuses_cross_origin(self):
         import urllib.request
