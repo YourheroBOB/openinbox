@@ -1257,7 +1257,7 @@ def slide_file(req):
     return Raw(path.read_bytes(), "text/html; charset=utf-8")
 
 
-@get("/api/contacts")
+@get("/api/skills/crm")
 def contacts_list(req):
     q = (req.query.get("q") or "").strip().lower()
     rows = load_contacts()
@@ -1267,7 +1267,7 @@ def contacts_list(req):
     return {"contacts": rows, "file": _rel(contacts_path()), "stages": list(STAGES)}
 
 
-@post("/api/contacts/update")
+@post("/api/skills/crm/update")
 def contacts_update(req):
     b = req.body
     email = str(b.get("email") or "").strip().lower()
@@ -1292,7 +1292,7 @@ def contacts_update(req):
     return {"ok": True, "contact": c}
 
 
-@post("/api/contacts/delete")
+@post("/api/skills/crm/delete")
 def contacts_delete(req):
     email = str(req.body.get("email") or "").strip().lower()
     with _lock:

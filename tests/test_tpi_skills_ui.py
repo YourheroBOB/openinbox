@@ -28,8 +28,8 @@ class ModulesServedTest(unittest.TestCase):
     def test_listed_and_served(self):
         _, mods = srv.get("/api/ui-modules")
         for name, paths in (("skills.js", (b"/api/skills", b"/api/skills/run", b"/api/skills/settings",
-                                           b"/api/skills/slides", b"/api/contacts", b"/api/contacts/update",
-                                           b"/api/contacts/delete")),
+                                           b"/api/skills/slides", b"/api/skills/crm", b"/api/skills/crm/update",
+                                           b"/api/skills/crm/delete")),
                             ("usage.js", (b"/api/usage", b"/api/usage/clear"))):
             self.assertIn(f"/ui/modules/{name}", mods["modules"])
             status, headers, raw = srv.request("GET", f"/ui/modules/{name}")

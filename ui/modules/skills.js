@@ -309,7 +309,7 @@
     const box = document.getElementById("skContacts");
     if (!box) return;
     let d;
-    try { d = await getJSON("/api/contacts"); } catch { return; }
+    try { d = await getJSON("/api/skills/crm"); } catch { return; }
     const stages = d.stages || view.stages;
     box.innerHTML = (d.contacts || []).map((c) => `
       <div class="sk-ct" data-email="${h(c.email)}">
@@ -333,11 +333,11 @@
     try {
       if (b.dataset.ct === "del") {
         if (!window.confirm(t("delConfirm"))) return;
-        await postJSON("/api/contacts/delete", { email });
+        await postJSON("/api/skills/crm/delete", { email });
         notify(t("deleted"));
       } else {
         const f = (k) => card.querySelector(`[data-f="${k}"]`)?.value || "";
-        await postJSON("/api/contacts/update", { email, stage: f("stage"), tags: f("tags"), note: f("note") });
+        await postJSON("/api/skills/crm/update", { email, stage: f("stage"), tags: f("tags"), note: f("note") });
         notify(t("saved"));
       }
       loadContacts();
