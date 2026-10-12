@@ -20,6 +20,8 @@
 4. **更了解你**：文風、收信習慣、此刻要注意、常出現的寄件人（`vault/persona.md`）。
 5. **`yhbmail.py`**：接線、分類、本機快取。信箱脊。
 6. **自帶 Agent**：`local`／OpenAI 相容／CLI／HTTP。見 [adapters/README.md](adapters/README.md) 與 [adapters/README.zh-Hant.md](adapters/README.zh-Hant.md)。
+7. **技能**（側欄「✦ 技能」，`GET /api/skills`、`POST /api/skills/run`）：晨間簡報、幫我跟上、整理收件匣、幫我找、會前準備、這個人是誰、轉成投影片（獨立 HTML 投影片檔，存在 `data/slides/`）、加入聯絡人 CRM（本機 CRM，`data/contacts.json`，`GET /api/crm/contacts`、`POST /api/crm/contacts/update`、`POST /api/crm/contacts/delete`）。每個技能都有開關（`POST /api/skills/settings`，存在 `data/skills.json`），關閉的技能會拒絕執行。結果先在本機算出，有接 BYO agent 時再交給它改寫。
+8. **BYOK 用量**（側欄「📊 用量」，`GET /api/usage`）：每次呼叫你自己的模型都把 token 數記到 `data/usage.jsonl`（端點有回傳 `usage` 就記實數，否則估算）。不記提示詞、回答或金鑰。
 
 這是「信箱腦＋統一收件匣＋Agent」的架構實作，不是任何商業客戶端的畫面拷貝。與 GenSpark、Super App 或任何廠商郵件產品無關。預設不寄信。草稿不會離開這台機器，除非你自己接出去。
 

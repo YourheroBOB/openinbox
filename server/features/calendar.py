@@ -473,6 +473,31 @@ def _local_series(row: dict, lang: str, invites: dict | None = None) -> dict | N
             "ics_ev": {"start": s, "end": e, "rrule": rule, "exdates": [x for x in exdates if x], "rdates": []}}
 
 
+def series_choices(lang: str = "en") -> list[dict]:
+    """Every series the unified calendar knows, for readers outside the week view.
+
+    `id` is `local:<n>` or `sync:<events id>`. Callers pass that id back unchanged.
+    """
+    out = []
+    for item in series(lang):
+        pub = item["pub"]
+        start, end = item["ics_ev"].get("start"), item["ics_ev"].get("end")
+
+        def _iso(value) -> str:
+            if value is None:
+                return ""
+            if isinstance(value, datetime):
+                return value.isoformat(timespec="seconds")
+            return value.isoformat()
+
+        out.append({
+            "id": pub["id"], "title": pub.get("title") or "",
+            "start_local": _iso(start), "end_local": _iso(end),
+            "all_day": bool(pub.get("all_day")), "source": pub.get("source") or "",
+        })
+    return out
+
+
 def instances(ws: datetime, we: datetime, tz, lang: str = "en", cals: set | None = None) -> list[dict]:
     out = []
     for item in series(lang):
@@ -1915,6 +1940,11 @@ def cal_view(req):
     cals = {c for c in (req.query.get("cals") or "").split(",") if c} or None
     week_start = int(req.query["week_start"]) if req.query.get("week_start") in ("0", "1") else s["week_start"]
     return build_view(view, anchor, tz_name, extras, _lang(req), req.query.get("today"), cals, week_start)
+
+
+@get("/api/cal/series")
+def cal_series(req):
+    return {"events": series_choices(_lang(req))}
 
 
 @get("/api/cal/events")
