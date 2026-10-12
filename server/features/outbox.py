@@ -21,8 +21,12 @@ Life of a message:
   (`X-Unsent: 1`, so mail clients open it as an unsent message) and marked
   "awaiting the user to send it themselves". The transport seam
   (`_outbox_transport.py`) only has `disabled`, which never delivers.
-- A daemon ticker releases due messages while the server runs (set
+- A daemon ticker, started by the first outbox request (never at import, so scripts that
+  load the features do not get one), releases due messages while the server runs (set
   OPENINBOX_OUTBOX_TICK=0 to turn it off); every outbox request also catches up.
+- A message claimed for writing (`releasing`) and abandoned for over a minute (the process
+  died) is recovered: marked ready if its .eml is complete, else queued again. The file name
+  depends only on the message, so a retry never makes a second file.
 - The outbox tables are the user's record: the local-cache clear keeps them.
 """
 from __future__ import annotations
@@ -58,6 +62,7 @@ TOKEN_TTL = 15 * 60
 MIN_LEAD = 60
 MAX_LEAD_DAYS = 366
 MAX_RECIPIENTS = 50
+RELEASE_STALE = 60
 
 PLACEHOLDER_RE = re.compile(r"\[(?:TBD|待填)\]", re.I)
 ATTACH_RE = re.compile(r"(\battach(?:ed|ment|ments|ing)?\b|\benclosed\b|附件|附檔|檢附|如附)", re.I)
@@ -381,21 +386,26 @@ def item_view(row: dict, lang: str, now: datetime | None = None) -> dict:
 
 
 def list_items(states: list[str] | None, lang: str, limit: int = 200) -> list[dict]:
+    """The outbox view (ready/done/cancelled) lists ready mail first, then newest history; the
+    Scheduled view lists the soonest first. Ordering happens in SQL so LIMIT never hides new mail."""
     ensure_tables()
     con = yhbmail.db()
     if states:
         marks = ",".join("?" for _ in states)
-        rows = con.execute(f"SELECT * FROM outbox WHERE state IN ({marks}) "
-                           "ORDER BY COALESCE(release_ts, 9e18), id DESC LIMIT ?", (*states, limit))
+        if set(states) <= {READY, DONE, CANCELLED} and set(states) & {READY, DONE}:
+            rows = con.execute(
+                f"SELECT * FROM outbox WHERE state IN ({marks}) "
+                "AND (state != ? OR COALESCE(eml_path, '') != '') "
+                "ORDER BY (state = ?) DESC, COALESCE(NULLIF(released_at, ''), updated_at) DESC, id DESC LIMIT ?",
+                (*states, CANCELLED, READY, limit))
+        else:
+            rows = con.execute(f"SELECT * FROM outbox WHERE state IN ({marks}) "
+                               "ORDER BY COALESCE(release_ts, 9e18), id DESC LIMIT ?", (*states, limit))
     else:
         rows = con.execute("SELECT * FROM outbox ORDER BY id DESC LIMIT ?", (limit,))
     now = now_dt()
     out = [item_view(dict(r), lang, now) for r in rows]
     con.close()
-    if states and set(states) <= {READY, DONE, CANCELLED}:
-        ready = sorted((x for x in out if x["state"] == READY), key=lambda x: x["released_at"], reverse=True)
-        rest = sorted((x for x in out if x["state"] != READY), key=lambda x: x["updated_at"], reverse=True)
-        out = ready + rest
     return out
 
 
@@ -805,6 +815,16 @@ def build_eml(row: dict, when: datetime) -> bytes:
     return msg.as_bytes(policy=default_policy.clone(linesep="\r\n"))
 
 
+def _eml_path(row: dict, now: datetime):
+    """Where a message is written. Depends only on the row, so a retried release reuses the same file."""
+    when = datetime.fromtimestamp(row["release_ts"], yhbmail.TZ) if row.get("release_ts") else now
+    return when, outbox_dir() / f"{when:%Y%m%d-%H%M%S}-{int(row['id']):04d}-{_slug(row.get('subject'))}.eml"
+
+
+def _resume_state(row: dict) -> str:
+    return UNDO if row.get("mode") == "now" else SCHEDULED
+
+
 def _release(outbox_id: int, now: datetime) -> dict | None:
     with _lock:
         con = yhbmail.db()
@@ -813,41 +833,96 @@ def _release(outbox_id: int, now: datetime) -> dict | None:
             con.close()
             return None
         prev = row["state"]
-        n = con.execute("UPDATE outbox SET state=?, updated_at=? WHERE id=? AND state=?",
-                        (RELEASING, _iso(now), outbox_id, prev)).rowcount
+        n = con.execute("UPDATE outbox SET state=?, updated_at=? WHERE id=? AND state=? AND release_ts <= ?",
+                        (RELEASING, _iso(now_dt()), outbox_id, prev, now.timestamp())).rowcount
         con.commit()
         con.close()
         if not n:
             return None
         row = dict(row)
+        path = None
         try:
-            when = datetime.fromtimestamp(row["release_ts"], yhbmail.TZ) if row["release_ts"] else now
-            folder = outbox_dir()
-            folder.mkdir(parents=True, exist_ok=True)
-            path = folder / f"{when:%Y%m%d-%H%M%S}-{outbox_id:04d}-{_slug(row['subject'])}.eml"
+            when, path = _eml_path(row, now)
+            path.parent.mkdir(parents=True, exist_ok=True)
             tmp = path.with_suffix(".eml.tmp")
             tmp.write_bytes(build_eml(row, when))
             tmp.replace(path)
             t = transport.get(load_settings()["transport"])
             result = t.deliver(path, {"id": outbox_id}) if t.enabled else {"delivered": False, "detail": t.name}
             con = yhbmail.db()
-            con.execute("UPDATE outbox SET state=?, released_at=?, eml_path=?, transport=?, transport_detail=?, "
-                        "updated_at=? WHERE id=?",
-                        (READY, _iso(now), _rel(path), t.name, str(result.get("detail") or "")[:300], _iso(now),
-                         outbox_id))
-            _log(con, outbox_id, "released", "system", _rel(path))
+            n = con.execute("UPDATE outbox SET state=?, released_at=?, eml_path=?, transport=?, transport_detail=?, "
+                            "updated_at=? WHERE id=? AND state=?",
+                            (READY, _iso(now), _rel(path), t.name, str(result.get("detail") or "")[:300], _iso(now),
+                             outbox_id, RELEASING)).rowcount
+            if n:
+                _log(con, outbox_id, "released", "system", _rel(path))
             con.commit()
             con.close()
+            if not n:
+                _drop_orphan(outbox_id, path)
+                return None
         except Exception as e:
             con = yhbmail.db()
-            con.execute("UPDATE outbox SET state=?, note=?, updated_at=? WHERE id=?",
-                        (prev, f"release failed: {type(e).__name__}: {e}"[:300], _iso(now), outbox_id))
+            con.execute("UPDATE outbox SET state=?, note=?, updated_at=? WHERE id=? AND state=?",
+                        (prev, f"release failed: {type(e).__name__}: {e}"[:300], _iso(now), outbox_id, RELEASING))
             _log(con, outbox_id, "release_failed", "system", f"{type(e).__name__}: {e}")
             con.commit()
             con.close()
+            if path is not None:
+                path.with_suffix(".eml.tmp").unlink(missing_ok=True)
             traceback.print_exc(file=sys.stderr)
             return None
     return _row(outbox_id)
+
+
+def _drop_orphan(outbox_id: int, path) -> None:
+    """A release that lost its claim (recovered elsewhere, then cancelled) must not leave a stray .eml."""
+    row = _row(outbox_id) or {}
+    if row.get("state") in (READY, DONE) and row.get("eml_path") == _rel(path):
+        return
+    if row.get("state") in PENDING + (RELEASING,):
+        return
+    path.unlink(missing_ok=True)
+
+
+def recover_releasing(stale: float = RELEASE_STALE) -> list[int]:
+    """Messages left in `releasing` by a process that died mid-write. A complete .eml means the write
+    finished: mark it ready. Otherwise drop the partial file and put it back in its queue to retry."""
+    if not yhbmail.DB.exists():
+        return []
+    ensure_tables()
+    cutoff = now_dt().timestamp() - stale
+    fixed = []
+    with _lock:
+        con = yhbmail.db()
+        rows = [dict(r) for r in con.execute("SELECT * FROM outbox WHERE state=?", (RELEASING,))]
+        con.close()
+        for row in rows:
+            seen = parse_when(row.get("updated_at"))
+            if seen is not None and seen.timestamp() > cutoff:
+                continue
+            now = now_dt()
+            _, path = _eml_path(row, now)
+            path.with_suffix(".eml.tmp").unlink(missing_ok=True)
+            con = yhbmail.db()
+            if path.is_file():
+                t = transport.get(load_settings()["transport"])
+                n = con.execute("UPDATE outbox SET state=?, released_at=?, eml_path=?, transport=?, "
+                                "transport_detail=?, updated_at=? WHERE id=? AND state=?",
+                                (READY, _iso(now), _rel(path), t.name, "recovered", _iso(now), row["id"],
+                                 RELEASING)).rowcount
+                event, detail = "release_recovered", _rel(path)
+            else:
+                back = _resume_state(row)
+                n = con.execute("UPDATE outbox SET state=?, updated_at=? WHERE id=? AND state=?",
+                                (back, _iso(now), row["id"], RELEASING)).rowcount
+                event, detail = "release_retry", back
+            if n:
+                _log(con, row["id"], event, "system", detail)
+                fixed.append(row["id"])
+            con.commit()
+            con.close()
+    return fixed
 
 
 def release_due(now: datetime | None = None) -> list[dict]:
@@ -856,6 +931,7 @@ def release_due(now: datetime | None = None) -> list[dict]:
         return []
     now = now or now_dt()
     ensure_tables()
+    recover_releasing()
     con = yhbmail.db()
     ids = [r[0] for r in con.execute("SELECT id FROM outbox WHERE state IN (?, ?) AND release_ts <= ? ORDER BY "
                                      "release_ts", (*PENDING, now.timestamp()))]
@@ -1102,6 +1178,3 @@ def outbox_done(req):
 def outbox_tick(req):
     lang = _lang(req)
     return {"released": [item_view(r, lang) for r in release_due()], "summary": summary(lang)}
-
-
-start_ticker()
