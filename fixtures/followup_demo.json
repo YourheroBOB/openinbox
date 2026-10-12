@@ -1,0 +1,25 @@
+{
+  "comment": "Fictional replies to the demo sent mail (fixtures/demo_sent.json), read by the follow-up tracker in demo mode only. They show a reply clearing a follow-up; never synced or sent anywhere.",
+  "replies": [
+    {
+      "id": "demo:you@example.com:r1",
+      "account": "you@example.com",
+      "thread_id": "s5",
+      "subject": "Re: Contract designer brief",
+      "from_addr": "Priya Nair <priya@talentloop.example>",
+      "to_addr": "Alex Chen <you@example.com>",
+      "date_raw": "2026-09-16 18:05",
+      "body_text": "Hi Alex,\n\nThree portfolios attached. The second one has the most onboarding work.\n\nPriya"
+    },
+    {
+      "id": "demo:you@example.com:r2",
+      "account": "you@example.com",
+      "thread_id": "m4",
+      "subject": "Re: Invitation: Design review Thursday 16:00",
+      "from_addr": "Maya Singh <maya@studio.example>",
+      "to_addr": "Alex Chen <you@example.com>",
+      "date_raw": "2026-09-16 11:20",
+      "body_text": "Sure, onboarding screens first. See you Thursday.\n\nMaya"
+    }
+  ]
+}

@@ -17,3 +17,5 @@ vault/cards/*.md
 .idea/
 .vscode/
 *.log
+rules.json
+rules.json.tmp

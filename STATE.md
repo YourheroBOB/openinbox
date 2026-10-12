@@ -2,8 +2,8 @@
 
 goal: 功能 100% 對齊 Genspark GenMail（BYOK、本機優先、不寄信）
 status: doing
-next: GB1 orchestrator 依序派工，未完成 WP：tpi-skills、tpi-calendar、tpi-mailops、tpi-outbox、tpi-followup、tpi-agents、tpi-mobile
-parity: 17/38（45%）　更新：2026-10-11 22:15 (UTC+8)
+next: GB1 orchestrator 依序派工，未完成 WP：tpi-skills、tpi-outbox
+parity: 32/38（84%）　更新：2026-10-12 14:00 (UTC+8)
 
 ## 運作方式
 - 正本在 GitHub；GB1 `/workspace/cursor-runs/parity/orchestrate.py` 每 15 分鐘依 work package（WP）派 `run_loop.sh`（最多 4 個平行、分支 `agent/<wp>`、各自狀態檔 `state/<wp>.md`）。
@@ -23,34 +23,34 @@ parity: 17/38（45%）　更新：2026-10-11 22:15 (UTC+8)
 | F06 | AI Write：依信件脈絡＋你的語氣起草；調語氣（更正式／更短／更友善）；具體指示 | done | tpi-compose | 單元測試：tone、instruction 參數影響輸出（local driver） |
 | F07 | AI 草稿風格設定 Professional／Balanced／Casual（可逐封覆寫） | done | tpi-compose | 單元測試：設定存取＋prompt 帶入 |
 | F08 | 從你修改草稿中學習語氣（越用越像你） | done | tpi-compose | 單元測試：草稿 diff 存成 voice sample，persona 更新 |
-| F09 | Skills：Morning Brief／Catch Me Up／Organize Inbox／Find It For Me＋可逐項開關 | blocked | tpi-skills | 單元測試：四技能可跑、關閉後拒跑 |
-| F10 | Skills：Meeting Prep／Brief this person／Turn into a slide／CRM this contact | blocked | tpi-skills | 單元測試：四技能輸出（slide=HTML/MD 檔、CRM=本機 contacts.json） |
+| F09 | Skills：Morning Brief／Catch Me Up／Organize Inbox／Find It For Me＋可逐項開關 | review | tpi-skills | 單元測試：四技能可跑、關閉後拒跑 |
+| F10 | Skills：Meeting Prep／Brief this person／Turn into a slide／CRM this contact | review | tpi-skills | 單元測試：四技能輸出（slide=HTML/MD 檔、CRM=本機 contacts.json） |
 | F11 | 自然語言搜尋（依語意找信，含 from／日期／附件條件） | done | tpi-search | 單元測試：FTS5＋NL 查詢解析，demo 資料命中 |
 | F12 | 聯絡人搜尋與聯絡人清單 | done | tpi-search | 單元測試：/api/contacts 與搜尋 |
 | F13 | Email Brain 分頁：身分職場、寫作語氣、常聯絡人與關係、進行中專案、工作模式 | done | tpi-brain | 單元測試：/api/brain/profile 各區塊由 demo 信件推得 |
 | F14 | Email Brain「Fix」修正推論，立即影響後續行為 | done | tpi-brain | 單元測試：fix 後 profile 與 draft prompt 反映修正 |
-| F15 | 統一行事曆：週／月檢視、多時區、建立事件、RSVP 狀態 | review | tpi-calendar | 單元測試＋smoke：事件 CRUD（本機）、時區轉換、RSVP 欄位 |
-| F16 | AI 代訂會議（agent 可建立事件）＋邀請草稿 | review | tpi-calendar | 單元測試：agent tool create_event＋產 .ics 邀請草稿（不寄出） |
-| F17 | 同事行事曆分享檢視＋free/busy 面板 | review | tpi-calendar | 單元測試：匯入 ICS URL/檔案、free/busy 計算 |
-| F18 | Schedule Send＋Scheduled 資料夾（可編輯／取消） | todo | tpi-outbox | 單元測試：排程佇列、取消、到期移到 outbox（本機，無寄信傳輸） |
-| F19 | Undo Send 倒數（倒數內可取消） | todo | tpi-outbox | 單元測試＋UI：倒數取消流程 |
-| F20 | 寄出前一律人工確認（agent 不代你發言） | todo | tpi-outbox | 單元測試：未確認的草稿不得進 outbox；預設無寄信傳輸 |
+| F15 | 統一行事曆：週／月檢視、多時區、建立事件、RSVP 狀態 | done | tpi-calendar | 單元測試＋smoke：事件 CRUD（本機）、時區轉換、RSVP 欄位 |
+| F16 | AI 代訂會議（agent 可建立事件）＋邀請草稿 | done | tpi-calendar | 單元測試：agent tool create_event＋產 .ics 邀請草稿（不寄出） |
+| F17 | 同事行事曆分享檢視＋free/busy 面板 | done | tpi-calendar | 單元測試：匯入 ICS URL/檔案、free/busy 計算 |
+| F18 | Schedule Send＋Scheduled 資料夾（可編輯／取消） | blocked | tpi-outbox | 單元測試：排程佇列、取消、到期移到 outbox（本機，無寄信傳輸） |
+| F19 | Undo Send 倒數（倒數內可取消） | blocked | tpi-outbox | 單元測試＋UI：倒數取消流程 |
+| F20 | 寄出前一律人工確認（agent 不代你發言） | blocked | tpi-outbox | 單元測試：未確認的草稿不得進 outbox；預設無寄信傳輸 |
 | F21 | 電子報／廣告整理成 digest | done | tpi-triage | 單元測試：Other 類生成 digest |
-| F22 | 資料夾與動作：Inbox／Starred／Drafts／Sent／Archive／Trash；封存／刪除／移動／標星 | doing | tpi-mailops | 單元測試：本機狀態切換＋API |
-| F23 | 全部標為已讀（跨所有帳號） | doing | tpi-mailops | 單元測試：/api/mark-all-read |
-| F24 | 預覽／列印／存成 PDF | doing | tpi-mailops | smoke：/print/<id> 印刷版 HTML（瀏覽器存 PDF） |
-| F25 | 一鍵行內翻譯（讀與回覆） | doing | tpi-mailops | 單元測試：/api/translate（BYO agent；無 LLM 時清楚提示） |
-| F26 | 新信通知（桌面／手機） | doing | tpi-mailops | UI：Notification API＋輪詢；單元測試 /api/new-since |
-| F27 | 帳號設定：新增／移除／排序主帳號；每帳號簽名＋匯入 | doing | tpi-mailops | 單元測試：accounts API 寫 accounts.json、signature 存取 |
+| F22 | 資料夾與動作：Inbox／Starred／Drafts／Sent／Archive／Trash；封存／刪除／移動／標星 | done | tpi-mailops | 單元測試：本機狀態切換＋API |
+| F23 | 全部標為已讀（跨所有帳號） | done | tpi-mailops | 單元測試：/api/mark-all-read |
+| F24 | 預覽／列印／存成 PDF | done | tpi-mailops | smoke：/print/<id> 印刷版 HTML（瀏覽器存 PDF） |
+| F25 | 一鍵行內翻譯（讀與回覆） | done | tpi-mailops | 單元測試：/api/translate（BYO agent；無 LLM 時清楚提示） |
+| F26 | 新信通知（桌面／手機） | done | tpi-mailops | UI：Notification API＋輪詢；單元測試 /api/new-since |
+| F27 | 帳號設定：新增／移除／排序主帳號；每帳號簽名＋匯入 | done | tpi-mailops | 單元測試：accounts API 寫 accounts.json、signature 存取 |
 | F28 | 撰寫器中日韓字型選擇 | done | tpi-compose | UI＋單元測試：字型設定存取 |
-| F29 | 追蹤未回覆（寄出後沒回的 thread 浮上來） | todo | tpi-followup | 單元測試：N 天無回覆偵測 |
-| F30 | 自動化規則：符合條件的信自動標籤／歸檔／起草 | todo | tpi-followup | 單元測試：JSON 規則 dry-run 與套用 |
-| F31 | 夜班 agent：背景分流＋預備草稿＋早晨交接 | todo | tpi-followup | 單元測試：scripts/overnight 一次跑完產出 brief |
-| F32 | Super agent 動作：研究人物／公司、會議準備（BYO agent＋連接器） | todo | tpi-agents | 單元測試：research/meeting-prep 經 agent bridge |
-| F33 | GenTeam：寄信／@ 提及 agent 進 thread、成果卡片預覽 | todo | tpi-agents | 單元測試：@agent 觸發、deliverable card API |
+| F29 | 追蹤未回覆（寄出後沒回的 thread 浮上來） | done | tpi-followup | 單元測試：N 天無回覆偵測 |
+| F30 | 自動化規則：符合條件的信自動標籤／歸檔／起草 | done | tpi-followup | 單元測試：JSON 規則 dry-run 與套用 |
+| F31 | 夜班 agent：背景分流＋預備草稿＋早晨交接 | done | tpi-followup | 單元測試：scripts/overnight 一次跑完產出 brief |
+| F32 | Super agent 動作：研究人物／公司、會議準備（BYO agent＋連接器） | done | tpi-agents | 單元測試：research/meeting-prep 經 agent bridge |
+| F33 | GenTeam：寄信／@ 提及 agent 進 thread、成果卡片預覽 | done | tpi-agents | 單元測試：@agent 觸發、deliverable card API |
 | F34 | Agent 連接器：MCP 伺服器（stdio JSON-RPC）提供 inbox 工具 | done | tpi-mcp | 單元測試：initialize／tools/list／tools/call |
-| F35 | 用量／點數頁 → BYOK token 用量紀錄 | blocked | tpi-skills | 單元測試：usage jsonl 記錄與 /api/usage |
-| F36 | Mac／Windows／iOS／Android → 可安裝 PWA＋行動版版面 | todo | tpi-mobile | smoke：manifest、service worker、窄螢幕版面 |
+| F35 | 用量／點數頁 → BYOK token 用量紀錄 | review | tpi-skills | 單元測試：usage jsonl 記錄與 /api/usage |
+| F36 | Mac／Windows／iOS／Android → 可安裝 PWA＋行動版版面 | done | tpi-mobile | smoke：manifest、service worker、窄螢幕版面 |
 | F37 | 隱私：信件留在信箱供應商；本機快取可清除；不經第三方伺服器 | done | tpi-foundation | README 說明＋單元測試：/api/cache/clear |
 | F38 | Linux／雲端主機可跑（tests＋smoke 綠燈、雲端執行說明） | done | tpi-foundation | scripts/smoke.sh＋CI unittest 綠燈 |
 
@@ -68,38 +68,38 @@ parity: 17/38（45%）　更新：2026-10-11 22:15 (UTC+8)
 | tpi-providers | merged | tpi-foundation | 2 | https://github.com/YourheroBOB/openinbox/pull/6 |
 | tpi-triage | merged | tpi-foundation | 3 | https://github.com/YourheroBOB/openinbox/pull/8 |
 | tpi-compose | merged | tpi-foundation | 3 | https://github.com/YourheroBOB/openinbox/pull/10 |
-| tpi-skills | needs-bob | tpi-foundation | 2 | https://github.com/YourheroBOB/openinbox/pull/12 |
+| tpi-skills | pr-review | tpi-foundation | 2 | https://github.com/YourheroBOB/openinbox/pull/29 |
 | tpi-search | merged | tpi-foundation | 2 | https://github.com/YourheroBOB/openinbox/pull/11 |
 | tpi-brain | merged | tpi-foundation | 1 | https://github.com/YourheroBOB/openinbox/pull/15 |
-| tpi-calendar | pr-review | tpi-foundation | 1 | https://github.com/YourheroBOB/openinbox/pull/16 |
-| tpi-mailops | retry | tpi-foundation | 1 | - |
-| tpi-outbox | pending | tpi-compose | 0 | - |
-| tpi-followup | pending | tpi-triage | 0 | - |
-| tpi-agents | pending | tpi-skills | 0 | - |
-| tpi-mobile | pending | tpi-mailops | 0 | - |
+| tpi-calendar | merged | tpi-foundation | 1 | https://github.com/YourheroBOB/openinbox/pull/16 |
+| tpi-mailops | merged | tpi-foundation | 3 | https://github.com/YourheroBOB/openinbox/pull/21 |
+| tpi-outbox | needs-bob | tpi-compose | 2 | https://github.com/YourheroBOB/openinbox/pull/22 |
+| tpi-followup | merged | tpi-triage | 2 | https://github.com/YourheroBOB/openinbox/pull/20 |
+| tpi-agents | merged | tpi-skills | 1 | https://github.com/YourheroBOB/openinbox/pull/28 |
+| tpi-mobile | merged | tpi-mailops | 2 | https://github.com/YourheroBOB/openinbox/pull/25 |
 
 ## 來源卡片
 - Linear HQ-1173：土炮 GenMail MVP（openinbox＋gsk 驅動＋BYOK，本機 8788 埠）。
 - Linear HQ-1299：v2.0（分類器升級、歷史回填、情報雷達、MCP 伺服器）— YHB 專屬部分已移到私有 yhb-mail；通用 MCP 伺服器在本 repo 由 tpi-mcp 實作。
 
 ## log
-- [2026-10-11 16:30:07] defer launch: GB1 已有 3 個 run_loop（上限 3）
-- [2026-10-11 16:45:02] tpi-compose merged https://github.com/YourheroBOB/openinbox/pull/10
-- [2026-10-11 16:45:34] tpi-skills remote test auto 43a92b2: pass
-- [2026-10-11 16:46:02] tpi-search remote test auto 617c4a8: pass
-- [2026-10-11 17:04:00] tpi-skills remote test auto a2fb8ec: FAIL
-- [2026-10-11 17:04:04] launch tpi-brain attempt 1 (a) log=/workspace/cursor-runs/tpi-brain-a1.log
-- [2026-10-11 17:04:06] launch tpi-calendar attempt 1 (a) log=/workspace/cursor-runs/tpi-calendar-a1.log
-- [2026-10-11 17:30:31] tpi-skills remote test auto 6a49fc1: pass
-- [2026-10-11 17:30:39] STATE sync PR https://github.com/YourheroBOB/openinbox/pull/14
-- [2026-10-11 20:22:10] tpi-brain remote test auto 547a85c: FAIL
-- [2026-10-11 20:45:03] tpi-search merged https://github.com/YourheroBOB/openinbox/pull/11
-- [2026-10-11 20:45:39] tpi-calendar remote test auto 5c5fa8e: pass
-- [2026-10-11 20:45:43] launch tpi-mailops attempt 1 (a) log=/workspace/cursor-runs/tpi-mailops-a1.log
-- [2026-10-11 20:45:46] STATE sync PR https://github.com/YourheroBOB/openinbox/pull/17
-- [2026-10-11 22:02:37] tpi-brain merged https://github.com/YourheroBOB/openinbox/pull/15
-- [2026-10-11 22:02:55] tpi-calendar remote test auto a0aa314: FAIL
-- [2026-10-11 22:02:57] defer launch: GB1 MemAvailable 1.8G < 3.5G
-- [2026-10-11 22:02:57] defer launch: GB1 MemAvailable 1.8G < 3.5G
-- [2026-10-11 22:15:05] defer launch: GB1 MemAvailable 2.3G < 3.5G
-- [2026-10-11 22:15:05] defer launch: GB1 MemAvailable 2.3G < 3.5G
+- [2026-10-11 23:15:05] launch tpi-outbox attempt 2 (r) log=/workspace/cursor-runs/tpi-outbox-r2.log
+- [2026-10-11 23:15:05] launch tpi-followup attempt 2 (r) log=/workspace/cursor-runs/tpi-followup-r2.log
+- [2026-10-11 23:31:07] tpi-mailops remote test auto 1a5f483: pass
+- [2026-10-11 23:32:43] tpi-outbox remote test auto 0ab9dca: FAIL
+- [2026-10-11 23:33:46] tpi-followup remote test auto ea8596f: pass
+- [2026-10-11 23:45:03] tpi-mailops merged https://github.com/YourheroBOB/openinbox/pull/21
+- [2026-10-11 23:46:10] tpi-followup remote test auto 3a67a97: pass
+- [2026-10-11 23:46:12] launch tpi-mobile attempt 1 (a) log=/workspace/cursor-runs/tpi-mobile-a1.log
+- [2026-10-11 23:46:16] STATE sync PR https://github.com/YourheroBOB/openinbox/pull/23
+- [2026-10-12 00:00:03] tpi-followup merged https://github.com/YourheroBOB/openinbox/pull/20
+- [2026-10-12 00:00:05] launch tpi-mobile attempt 2 (r) log=/workspace/cursor-runs/tpi-mobile-r2.log
+- [2026-10-12 00:15:07] STATE sync PR https://github.com/YourheroBOB/openinbox/pull/24
+- [2026-10-12 08:01:46] tpi-mobile remote test auto 1ddf2ac: pass
+- [2026-10-12 08:15:03] tpi-mobile merged https://github.com/YourheroBOB/openinbox/pull/25
+- [2026-10-12 08:15:07] STATE sync PR https://github.com/YourheroBOB/openinbox/pull/26
+- [2026-10-12 08:50:07] launch tpi-agents attempt 1 (v2a) log=/workspace/cursor-runs/tpi-agents-v2a1.log
+- [2026-10-12 08:50:07] tpi-agents: A/B BRIEF=v2 手動派工（ab-brief，跳過 deps tpi-skills＝needs-bob 未合併）
+- [2026-10-12 09:16:42] tpi-agents remote test auto fc0154b: pass
+- [2026-10-12 13:45:34] tpi-skills remote test auto ef6a8a9: pass
+- [2026-10-12 14:00:08] tpi-agents merged https://github.com/YourheroBOB/openinbox/pull/28
