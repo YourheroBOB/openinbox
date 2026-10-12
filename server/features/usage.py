@@ -27,6 +27,7 @@ from pathlib import Path
 import agent_bridge
 import yhbmail
 from features import get, post
+from features._origin import local_origin, refuse
 
 USAGE_PATH: Path = yhbmail.DATA / "usage.jsonl"
 CJK_RE = re.compile(r"[\u3000-\u9fff\uac00-\ud7af\uf900-\ufaff\uff00-\uffef]")
@@ -304,12 +305,16 @@ def _int(value, default: int, lo: int = 1, hi: int = 3650) -> int:
 
 @get("/api/usage")
 def usage_report(req):
+    if not local_origin(req):
+        return refuse(req.lang_zh())
     return report(_int(req.query.get("days"), 30), _int(req.query.get("limit"), 50, hi=500),
                   "zh-Hant" if req.lang_zh() else "en")
 
 
 @post("/api/usage/clear")
 def usage_clear(req):
+    if not local_origin(req):
+        return refuse(req.lang_zh())
     n = clear()
     note = f"已清除 {n} 筆用量紀錄。" if req.lang_zh() else f"Cleared {n} usage entries."
     return {"ok": True, "cleared": n, "note": note}

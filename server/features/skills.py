@@ -33,6 +33,7 @@ import yhbmail
 from features import Raw, get, post
 from features import triage
 from features import usage
+from features._origin import local_origin, refuse
 
 SKILLS = [
     {"slug": "morning-brief", "group": "F09", "prompt": "morning-brief", "inputs": ["today"],
@@ -152,7 +153,7 @@ def load_settings() -> dict:
     enabled = raw.get("enabled") if isinstance(raw.get("enabled"), dict) else {}
     runs = raw.get("runs") if isinstance(raw.get("runs"), dict) else {}
     return {
-        "enabled": {s["slug"]: bool(enabled.get(s["slug"], True)) for s in SKILLS},
+        "enabled": {s["slug"]: enabled.get(s["slug"], True) is True for s in SKILLS},
         "runs": {k: v for k, v in runs.items() if k in BY_SLUG and isinstance(v, dict)},
         "updated_at": raw.get("updated_at") or "",
     }
@@ -171,10 +172,13 @@ def set_enabled(changes: dict) -> tuple[dict, int]:
     unknown = [k for k in changes if k not in BY_SLUG]
     if unknown:
         return {"error": f"unknown skill {', '.join(sorted(unknown))}", "skills": sorted(BY_SLUG)}, 400
+    not_bool = [k for k, v in changes.items() if not isinstance(v, bool)]
+    if not_bool:
+        return {"error": f"enabled must be true or false (JSON boolean) for {', '.join(sorted(not_bool))}"}, 400
     with _lock:
         s = load_settings()
         for k, v in changes.items():
-            s["enabled"][k] = bool(v)
+            s["enabled"][k] = v
         save_settings(s)
     return {"ok": True, "enabled": s["enabled"]}, 200
 
@@ -1213,11 +1217,13 @@ def skills_list(req):
 
 @post("/api/skills/settings")
 def skills_settings(req):
+    if not local_origin(req):
+        return refuse(req.lang_zh())
     b = req.body
     if isinstance(b.get("enabled"), dict):
         changes = b["enabled"]
     elif b.get("slug"):
-        changes = {str(b["slug"]): bool(b.get("enabled"))}
+        changes = {str(b["slug"]): b.get("enabled")}
     else:
         return {"error": "send {slug, enabled} or {enabled: {slug: bool}}"}, 400
     out, status = set_enabled(changes)
@@ -1230,6 +1236,8 @@ def skills_settings(req):
 
 @post("/api/skills/run")
 def skills_run(req):
+    if not local_origin(req):
+        return refuse(req.lang_zh())
     b = dict(req.body)
     slug = str(b.pop("skill", "") or b.pop("slug", "") or "")
     lang = _lang(req)
@@ -1239,6 +1247,8 @@ def skills_run(req):
 
 @get("/api/skills/slides")
 def slides_list(req):
+    if not local_origin(req):
+        return refuse(req.lang_zh())
     folder = slides_dir()
     files = sorted((p for p in folder.glob("*.html") if SLIDE_NAME_RE.match(p.name)),
                    key=lambda p: p.stat().st_mtime, reverse=True) if folder.is_dir() else []
@@ -1250,6 +1260,8 @@ def slides_list(req):
 
 @get("/api/skills/slides/*")
 def slide_file(req):
+    if not local_origin(req):
+        return refuse(req.lang_zh())
     name = unquote(req.params)
     path = slides_dir() / name
     if not SLIDE_NAME_RE.match(name) or not path.is_file():
@@ -1259,6 +1271,8 @@ def slide_file(req):
 
 @get("/api/skills/crm")
 def contacts_list(req):
+    if not local_origin(req):
+        return refuse(req.lang_zh())
     q = (req.query.get("q") or "").strip().lower()
     rows = load_contacts()
     if q:
@@ -1269,6 +1283,8 @@ def contacts_list(req):
 
 @post("/api/skills/crm/update")
 def contacts_update(req):
+    if not local_origin(req):
+        return refuse(req.lang_zh())
     b = req.body
     email = str(b.get("email") or "").strip().lower()
     if not email or not get_contact(email):
@@ -1278,7 +1294,9 @@ def contacts_update(req):
         return {"error": f"stage must be one of {', '.join(STAGES)}"}, 400
     with _lock:
         rows = load_contacts()
-        c = next(c for c in rows if c["email"] == email)
+        c = next((c for c in rows if c["email"] == email), None)
+        if c is None:
+            return {"error": "contact not found"}, 404
         if "tags" in b:
             c["tags"] = _clean_tags(b.get("tags"))
         if stage:
@@ -1294,6 +1312,8 @@ def contacts_update(req):
 
 @post("/api/skills/crm/delete")
 def contacts_delete(req):
+    if not local_origin(req):
+        return refuse(req.lang_zh())
     email = str(req.body.get("email") or "").strip().lower()
     with _lock:
         rows = load_contacts()
