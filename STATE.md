@@ -1,9 +1,9 @@
 # STATE — TooPowerInbox（openinbox）
 
 goal: 功能 100% 對齊 Genspark GenMail（BYOK、本機優先、不寄信）
-status: doing
-next: GB1 orchestrator 依序派工，未完成 WP：tpi-skills
-parity: 35/38（92%）　更新：2026-10-12 22:45 (UTC+8)
+status: done
+next: 全部 14 個 WP 已合併到 main；orchestrator 只做維護（新 PR／衝突追蹤）
+parity: 38/38（100%）　更新：2026-10-12 22:55 (UTC+8)
 
 ## 運作方式
 - 正本在 GitHub；GB1 `/workspace/cursor-runs/parity/orchestrate.py` 每 15 分鐘依 work package（WP）派 `run_loop.sh`（最多 4 個平行、分支 `agent/<wp>`、各自狀態檔 `state/<wp>.md`）。
@@ -23,8 +23,8 @@ parity: 35/38（92%）　更新：2026-10-12 22:45 (UTC+8)
 | F06 | AI Write：依信件脈絡＋你的語氣起草；調語氣（更正式／更短／更友善）；具體指示 | done | tpi-compose | 單元測試：tone、instruction 參數影響輸出（local driver） |
 | F07 | AI 草稿風格設定 Professional／Balanced／Casual（可逐封覆寫） | done | tpi-compose | 單元測試：設定存取＋prompt 帶入 |
 | F08 | 從你修改草稿中學習語氣（越用越像你） | done | tpi-compose | 單元測試：草稿 diff 存成 voice sample，persona 更新 |
-| F09 | Skills：Morning Brief／Catch Me Up／Organize Inbox／Find It For Me＋可逐項開關 | blocked | tpi-skills | 單元測試：四技能可跑、關閉後拒跑 |
-| F10 | Skills：Meeting Prep／Brief this person／Turn into a slide／CRM this contact | blocked | tpi-skills | 單元測試：四技能輸出（slide=HTML/MD 檔、CRM=本機 contacts.json） |
+| F09 | Skills：Morning Brief／Catch Me Up／Organize Inbox／Find It For Me＋可逐項開關 | done | tpi-skills | 單元測試：四技能可跑、關閉後拒跑 |
+| F10 | Skills：Meeting Prep／Brief this person／Turn into a slide／CRM this contact | done | tpi-skills | 單元測試：四技能輸出（slide=HTML/MD 檔、CRM=本機 contacts.json） |
 | F11 | 自然語言搜尋（依語意找信，含 from／日期／附件條件） | done | tpi-search | 單元測試：FTS5＋NL 查詢解析，demo 資料命中 |
 | F12 | 聯絡人搜尋與聯絡人清單 | done | tpi-search | 單元測試：/api/contacts 與搜尋 |
 | F13 | Email Brain 分頁：身分職場、寫作語氣、常聯絡人與關係、進行中專案、工作模式 | done | tpi-brain | 單元測試：/api/brain/profile 各區塊由 demo 信件推得 |
@@ -49,7 +49,7 @@ parity: 35/38（92%）　更新：2026-10-12 22:45 (UTC+8)
 | F32 | Super agent 動作：研究人物／公司、會議準備（BYO agent＋連接器） | done | tpi-agents | 單元測試：research/meeting-prep 經 agent bridge |
 | F33 | GenTeam：寄信／@ 提及 agent 進 thread、成果卡片預覽 | done | tpi-agents | 單元測試：@agent 觸發、deliverable card API |
 | F34 | Agent 連接器：MCP 伺服器（stdio JSON-RPC）提供 inbox 工具 | done | tpi-mcp | 單元測試：initialize／tools/list／tools/call |
-| F35 | 用量／點數頁 → BYOK token 用量紀錄 | blocked | tpi-skills | 單元測試：usage jsonl 記錄與 /api/usage |
+| F35 | 用量／點數頁 → BYOK token 用量紀錄 | done | tpi-skills | 單元測試：usage jsonl 記錄與 /api/usage |
 | F36 | Mac／Windows／iOS／Android → 可安裝 PWA＋行動版版面 | done | tpi-mobile | smoke：manifest、service worker、窄螢幕版面 |
 | F37 | 隱私：信件留在信箱供應商；本機快取可清除；不經第三方伺服器 | done | tpi-foundation | README 說明＋單元測試：/api/cache/clear |
 | F38 | Linux／雲端主機可跑（tests＋smoke 綠燈、雲端執行說明） | done | tpi-foundation | scripts/smoke.sh＋CI unittest 綠燈 |
@@ -68,7 +68,7 @@ parity: 35/38（92%）　更新：2026-10-12 22:45 (UTC+8)
 | tpi-providers | merged | tpi-foundation | 2 | https://github.com/YourheroBOB/openinbox/pull/6 |
 | tpi-triage | merged | tpi-foundation | 3 | https://github.com/YourheroBOB/openinbox/pull/8 |
 | tpi-compose | merged | tpi-foundation | 3 | https://github.com/YourheroBOB/openinbox/pull/10 |
-| tpi-skills | needs-bob | tpi-foundation | 2 | https://github.com/YourheroBOB/openinbox/pull/34 |
+| tpi-skills | merged | tpi-foundation | 2 | https://github.com/YourheroBOB/openinbox/pull/27 |
 | tpi-search | merged | tpi-foundation | 2 | https://github.com/YourheroBOB/openinbox/pull/11 |
 | tpi-brain | merged | tpi-foundation | 1 | https://github.com/YourheroBOB/openinbox/pull/15 |
 | tpi-calendar | merged | tpi-foundation | 1 | https://github.com/YourheroBOB/openinbox/pull/16 |
@@ -83,9 +83,6 @@ parity: 35/38（92%）　更新：2026-10-12 22:45 (UTC+8)
 - Linear HQ-1299：v2.0（分類器升級、歷史回填、情報雷達、MCP 伺服器）— YHB 專屬部分已移到私有 yhb-mail；通用 MCP 伺服器在本 repo 由 tpi-mcp 實作。
 
 ## log
-- [2026-10-11 23:32:43] tpi-outbox remote test auto 0ab9dca: FAIL
-- [2026-10-11 23:33:46] tpi-followup remote test auto ea8596f: pass
-- [2026-10-11 23:45:03] tpi-mailops merged https://github.com/YourheroBOB/openinbox/pull/21
 - [2026-10-11 23:46:10] tpi-followup remote test auto 3a67a97: pass
 - [2026-10-11 23:46:12] launch tpi-mobile attempt 1 (a) log=/workspace/cursor-runs/tpi-mobile-a1.log
 - [2026-10-11 23:46:16] STATE sync PR https://github.com/YourheroBOB/openinbox/pull/23
@@ -103,3 +100,6 @@ parity: 35/38（92%）　更新：2026-10-12 22:45 (UTC+8)
 - [2026-10-12 14:00:13] STATE sync PR https://github.com/YourheroBOB/openinbox/pull/30
 - [2026-10-12 20:49:09] tpi-skills remote test auto 6a3c4a8: pass
 - [2026-10-12 22:45:03] tpi-outbox merged https://github.com/YourheroBOB/openinbox/pull/22
+- [2026-10-12 22:45:10] STATE sync PR https://github.com/YourheroBOB/openinbox/pull/35
+- [2026-10-12 22:55:18] tpi-skills merged https://github.com/YourheroBOB/openinbox/pull/27
+- [2026-10-12 22:55:22] state-sync 修審查（PR #35 第 1 輪）：orchestrate.py 合併判斷改以 origin/main 為準（MERGED PR 含替代分支 agent/<wp>-*，merge commit 須在 main；後備認 main 上 agent/<wp>: squash commit），重產 STATE.md → tpi-skills merged #27、38/38；驗證：離線案例＋dry-run、unittest 711 OK、smoke OK（隨機 port）
