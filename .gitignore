@@ -18,3 +18,5 @@ vault/cards/*.md
 .vscode/
 *.log
 .pr-review/
+rules.json
+rules.json.tmp

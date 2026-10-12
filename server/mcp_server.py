@@ -140,15 +140,12 @@ class ToolArgError(ValueError):
 
 
 def mcp_tools() -> list[dict]:
-    """MCP tool descriptors, one per agent_bridge.TOOLS entry, in the same order."""
-    out = []
-    for t in agent_bridge.TOOLS:
-        spec = TOOL_SPECS.get(t["name"])
-        if spec is None:
-            spec = {"title": t["name"], "description": t.get("description") or "",
-                    "inputSchema": {"type": "object"}}
-        out.append({"name": t["name"], **spec})
-    return out
+    """MCP tool descriptors for the agent_bridge.TOOLS entries that have a TOOL_SPECS schema, in the same order.
+
+    Tools a feature plug-in adds at runtime (e.g. calendar create_event / find_free_time) stay HTTP-only:
+    tools/call only accepts names in TOOL_SPECS, so listing them here would advertise tools that fail.
+    """
+    return [{"name": t["name"], **TOOL_SPECS[t["name"]]} for t in agent_bridge.TOOLS if t["name"] in TOOL_SPECS]
 
 
 def validate_args(name: str, args) -> dict:

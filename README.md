@@ -93,7 +93,7 @@ Every account syncs into one inbox and each message is tagged with its account. 
 
 Then press **Refresh** in the dashboard.
 
-To wipe what this machine has cached (mail, events, Copilot history, derived cards), use **Clear local cache** in the sidebar or `POST /api/cache/clear` (`{"reseed": true}` reloads the demo mail). Drafts and the note cards you wrote stay. `GET /api/cache` shows what is cached.
+To wipe what this machine has cached (mail, events, Copilot history, derived cards), use **Clear local cache** in the sidebar or `POST /api/cache/clear` (`{"reseed": true}` reloads the demo mail). Drafts and the note cards you wrote stay. `GET /api/cache` shows what is cached. Calendar data you created or imported also stays: local / AI-booked events, invite drafts and imported colleague ICS feeds (`cal_feeds`). Remove a colleague feed with its delete button in the calendar's free/busy panel or `POST /api/cal/feed/delete` (`{"id": N}`).
 
 ## Run on a cloud Linux host
 
@@ -114,6 +114,17 @@ ssh -N -L 8770:127.0.0.1:8770 user@your-host.example.com
 ```
 
 Then open [http://127.0.0.1:8770/](http://127.0.0.1:8770/) locally. If 8770 is taken on the laptop, use `-L 8771:127.0.0.1:8770` and open port 8771. Keep the host firewall closed for 8770; the tunnel is the only way in. `accounts.json`, `agent.json`, `data/` and `vault/` live on the host, so treat its disk like your inbox.
+
+## Install as an app (Mac, Windows, iOS, Android)
+
+TooPowerInbox is an installable PWA, so there is no separate native app to download.
+
+- **Chrome / Edge on Mac, Windows, Linux, Android**: open [http://127.0.0.1:8770/](http://127.0.0.1:8770/) and press **📲 Install app** in the sidebar (or the install icon in the address bar).
+- **iPhone / iPad**: in Safari tap **Share → Add to Home Screen**.
+
+Below 760 px wide the panel switches to a phone layout: a bottom tab bar (Mail, Calendar, Drafts, Copilot, Menu), the sidebar as a slide-in drawer, and the message or Copilot as a full screen that the back gesture closes. Home-screen shortcuts jump straight to Mail, Calendar, Drafts or Copilot.
+
+Service workers need HTTPS or `127.0.0.1`. On a phone, forward the port with an SSH client app (the same `ssh -N -L 8770:127.0.0.1:8770 …` as above) and open `http://127.0.0.1:8770/`; the server still listens on loopback only. The service worker (`/sw.js`) caches only static files: the offline page, the manifest, icons and `ui/modules/*.js`. It never touches `/api/*`, so no mail is stored in the browser. When the server can't be reached the app shows an offline page with a retry button. `GET /api/mobile/info` lists exactly what is cached.
 
 ## Add a feature
 
@@ -148,6 +159,7 @@ server/app.py          HTTP + dashboard
 server/features/       plug-in routes (cache, plugins, imap, providers, …)
 ui/index.html          visualization panel (zh-Hant / en)
 ui/modules/            plug-in UI scripts
+ui/pwa/                service worker + offline page (served by server/features/mobile.py)
 skills/                morning-brief, catch-me-up, …
 tests/                 unittest suite
 scripts/smoke.sh       local smoke run
