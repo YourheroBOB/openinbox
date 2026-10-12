@@ -120,7 +120,8 @@ class FindItTest(unittest.TestCase):
     def test_keyword_across_mail_calendar_brain(self):
         _, out = run("find-it", query="northwind")
         self.assertEqual(self.ids(out), ["m7", "m1"])
-        self.assertEqual([e["title"] for e in out["data"]["events"]], ["Northwind investor call"])
+        self.assertEqual([e["title"] for e in out["data"]["events"]],
+                         ["Northwind investor call", "Northwind partner office hours (New York)"])
         self.assertTrue(out["data"]["cards"])
 
     def test_operators(self):
@@ -177,6 +178,50 @@ class FindItTest(unittest.TestCase):
         self.assertEqual((out["data"]["email"], out["data"]["total"]), ("archivist@old.example", 1))
         _, out = run("brief-person", person="archivist@old.example")
         self.assertEqual(out["data"]["topics"], ["Ancient Ledger Qzv"])
+
+    def test_purged_and_trashed_mail_stay_out_of_results_and_the_prompt(self):
+        from features import mailops
+        secret = "two lines you want cut"
+        eid = "demo:you@example.com:m1"
+        def _clear_state():
+            con = srv.yhbmail.db()
+            con.execute("DELETE FROM mail_state")
+            con.commit()
+            con.close()
+        self.addCleanup(_clear_state)
+        mailops.apply([eid], "purge")
+        _, out = run("find-it", query="northwind")
+        self.assertNotIn(eid, [m["id"] for m in out["data"]["mails"]])
+        prompt = skills.agent_prompt("find-it", out["markdown"], "en")
+        self.assertNotIn(eid, prompt)
+        self.assertNotIn(secret, prompt)
+        self.assertNotIn(secret, out["markdown"])
+        mailops.apply(["demo:you@example.com:m7"], "trash")
+        _, out = run("find-it", query="northwind")
+        self.assertNotIn("demo:you@example.com:m7", [m["id"] for m in out["data"]["mails"]])
+        self.assertNotIn("term sheet", out["markdown"].lower())
+
+    def test_unread_scan_is_capped(self):
+        con = srv.yhbmail.db()
+        base = int(srv.yhbmail.parse_date_ts("2026-09-17 09:00"))
+        for n in range(600):
+            srv.yhbmail.upsert_email(con, {
+                "id": f"unread:{n}", "account": "you@example.com", "subject": f"Unread {n}",
+                "snippet": "ping", "from_addr": "Ping <ping@notify.example>", "to_addr": "you@example.com",
+                "date_raw": "", "date_ts": base + n, "unread": 1, "body_text": "ping " * 40})
+        con.commit()
+        con.close()
+        self.addCleanup(self._drop_unread_bulk)
+        rows = skills.query_mail(["unread = 1"], [])
+        self.assertLessEqual(len(rows), skills.MAIL_CAP)
+        self.assertEqual(skills.parse_query('from:"" northwind')["from"], [])
+        self.assertEqual(skills.query_mail(["0"], []), [])
+
+    def _drop_unread_bulk(self):
+        con = srv.yhbmail.db()
+        con.execute("DELETE FROM emails WHERE id LIKE 'unread:%'")
+        con.commit()
+        con.close()
 
     def test_missing_query(self):
         status, out = run("find-it", query="  ")
