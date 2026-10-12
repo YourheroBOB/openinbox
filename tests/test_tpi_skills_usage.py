@@ -75,12 +75,16 @@ class EstimateTest(unittest.TestCase):
         self.assertGreater(usage.estimate_tokens([{"role": "user", "content": "hi"}]), 0)
 
     def test_wrappers_installed_once(self):
+        import subprocess
         import agent_bridge
         self.assertTrue(agent_bridge._post_json.__tpi_usage__)
         self.assertTrue(agent_bridge._cli.__tpi_usage__)
+        self.assertIs(agent_bridge.subprocess, subprocess)
+        self.assertIs(agent_bridge.note_cli_exit, usage._note_cli_exit)
         before = agent_bridge._post_json
         usage.install()
         self.assertIs(agent_bridge._post_json, before)
+        self.assertIs(agent_bridge.subprocess, subprocess)
 
 
 class RecordTest(unittest.TestCase):

@@ -3,7 +3,8 @@
 The recorder wraps the two places where agent_bridge talks to a model:
 `_post_json` (openai_compatible and http drivers) and `_cli` (cli driver), so
 Copilot, triage, skills and /api/v1/agent/run are all counted without editing
-them. Token counts come from the provider's `usage` block when it returns one;
+them. A failed CLI keeps its exit code via `agent_bridge.note_cli_exit`, not by
+replacing `agent_bridge.subprocess`. Token counts come from the provider's `usage` block when it returns one;
 otherwise they are estimated (CJK char = 1 token, other text = 4 chars per
 token) and the entry is marked `estimated`. Only counts and metadata are kept:
 never the prompt, the answer, the endpoint path, any API key, or an error's
@@ -170,19 +171,9 @@ def error_label(exc: BaseException, exit_code: int | None = None) -> str:
     return label
 
 
-class _RunSpy:
-    """Stands in for the subprocess module inside agent_bridge so _cli's exit code is known."""
-
-    def __init__(self, mod):
-        self._mod = mod
-
-    def __getattr__(self, name):
-        return getattr(self._mod, name)
-
-    def run(self, *a, **kw):
-        p = self._mod.run(*a, **kw)
-        _cli_exit.set(p.returncode)
-        return p
+def _note_cli_exit(code: int) -> None:
+    if isinstance(code, int):
+        _cli_exit.set(code)
 
 
 def _wrap_post_json(orig):
@@ -248,8 +239,7 @@ def install() -> None:
         agent_bridge._post_json = _wrap_post_json(agent_bridge._post_json)
     if not getattr(agent_bridge._cli, "__tpi_usage__", False):
         agent_bridge._cli = _wrap_cli(agent_bridge._cli)
-    if not isinstance(agent_bridge.subprocess, _RunSpy):
-        agent_bridge.subprocess = _RunSpy(agent_bridge.subprocess)
+    agent_bridge.note_cli_exit = _note_cli_exit
 
 
 install()
