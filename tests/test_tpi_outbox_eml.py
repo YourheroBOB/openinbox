@@ -99,6 +99,31 @@ class EmlTest(OutboxCase):
         self.assertEqual(outbox.release_due(), [])
         self.assertEqual(list(outbox.outbox_dir().glob("*.eml")) if outbox.outbox_dir().exists() else [], [])
 
+    def test_blocked_message_returns_to_drafts(self):
+        item = self.confirmed("now")
+        con = srv.yhbmail.db()
+        con.execute("UPDATE outbox SET subject=?, release_ts=? WHERE id=?",
+                    ("Hello\nBcc: leak@example.com", outbox.now_dt().timestamp() - 1, item["id"]))
+        con.commit()
+        con.close()
+        self.assertEqual(outbox.release_due(), [])
+        self.assertEqual(outbox._row(item["id"])["state"], "blocked")
+        out, status = outbox.edit(item["id"], "en")
+        self.assertEqual(status, 200, out)
+        self.assertEqual(outbox._row(item["id"])["state"], "cancelled")
+        restored = outbox.compose.get_draft(out["draft_id"])
+        self.assertEqual(restored["subject"], "Hello\nBcc: leak@example.com")
+
+    def test_outbox_responses_omit_wildcard_cors(self):
+        self.confirmed("now")
+        status, headers, raw = srv.request("GET", "/api/outbox/items")
+        self.assertEqual(status, 200)
+        self.assertNotIn("access-control-allow-origin", {k.lower() for k in headers})
+        self.assertIn(b"maya@example.com", raw)
+        status, headers, _ = srv.request("GET", "/api/health")
+        self.assertEqual(status, 200)
+        self.assertIn("access-control-allow-origin", {k.lower() for k in headers})
+
     def test_write_failure_keeps_the_message_queued(self):
         item = self.confirmed("now")
         with mock.patch.object(outbox, "build_eml", side_effect=OSError("disk full")), \

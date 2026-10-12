@@ -668,13 +668,19 @@ def confirm(data: dict, lang: str, now: datetime | None = None) -> tuple[dict, i
     stamp = _iso(now)
     with _lock:
         con = yhbmail.db()
+        # updated_at is whole seconds, so a same-second rewrite still matches the timestamp.
+        # Hold the write lock before reading the draft; the DELETE then cannot land on a newer body.
+        con.execute("BEGIN IMMEDIATE")
         fresh = con.execute("SELECT * FROM outbox WHERE id=? AND state=?", (row["id"], AWAITING)).fetchone()
-        if not fresh or not _draft_still_snapshot(con, dict(fresh)):
+        fresh_row = dict(fresh) if fresh else None
+        if (not fresh_row or digest(fresh_row) != (fresh_row.get("digest") or "")
+                or not _draft_still_snapshot(con, fresh_row)):
+            con.rollback()
             con.close()
             return _bad(zh, "草稿在預覽之後改過或已不在，請重新檢視。這次沒有刪除草稿，也沒有排程。",
                         "the draft changed or is gone since the preview; review it again. "
                         "The draft was not deleted and nothing was scheduled.", 409)
-        fresh = dict(fresh)
+        fresh = fresh_row
         n = con.execute(
             "UPDATE outbox SET state=?, mode=?, release_ts=?, release_at=?, confirmed_at=?, confirmed_by='user', "
             "token_hash='', token_expires=NULL, updated_at=? WHERE id=? AND state=?",
@@ -768,11 +774,11 @@ def undo(outbox_id, lang: str) -> tuple[dict, int]:
 
 
 def cancel(outbox_id, lang: str, keep_draft: bool = True) -> tuple[dict, int]:
-    return _back_to_drafts(outbox_id, (AWAITING, UNDO, SCHEDULED, READY), "cancel", lang, keep_draft)
+    return _back_to_drafts(outbox_id, (AWAITING, UNDO, SCHEDULED, READY, BLOCKED), "cancel", lang, keep_draft)
 
 
 def edit(outbox_id, lang: str) -> tuple[dict, int]:
-    return _back_to_drafts(outbox_id, (AWAITING, UNDO, SCHEDULED, READY), "edit", lang)
+    return _back_to_drafts(outbox_id, (AWAITING, UNDO, SCHEDULED, READY, BLOCKED), "edit", lang)
 
 
 def discard(outbox_id, lang: str) -> tuple[dict, int]:

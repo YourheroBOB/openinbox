@@ -70,12 +70,14 @@ class OutboxUiTest(unittest.TestCase):
     def test_confirm_button_needs_ack_and_no_blocking(self):
         src = JS.read_text()
         self.assertIn("const canConfirm = dlg.ack && !blocked", src)
+        self.assertIn("awaiting_confirm,undo_window,scheduled,blocked", src)
+        self.assertIn("it.state === \"blocked\"", src)
         self.assertIn('data-ob="confirm" ${canConfirm ? "" : "disabled"}', src)
 
     def test_everything_rendered_is_escaped(self):
         src = JS.read_text()
         for field in ("it.to", "it.cc", "it.bcc", "it.subject", "it.body", "it.account", "it.eml_path", "it.eml_name",
-                      "it.state_label", "it.eml_url", "p.label", "u.item.subject", "x)", "s.note", "s.outbox_dir"):
+                      "it.state_label", "it.eml_url", "it.note", "p.label", "u.item.subject", "x)", "s.note", "s.outbox_dir"):
             hits = list(re.finditer(r"\$\{([^{}]*" + re.escape(field) + r"(?!\w)[^{}]*)\}", src))
             self.assertTrue(hits, field)
             for m in hits:

@@ -420,7 +420,7 @@
     </div>`;
 
   async function loadView(view) {
-    const states = view === "scheduled" ? "awaiting_confirm,undo_window,scheduled" : "ready,done,cancelled";
+    const states = view === "scheduled" ? "awaiting_confirm,undo_window,scheduled,blocked" : "ready,done,cancelled";
     let items = [];
     try {
       if (!ob.settings) await loadSettings();
@@ -499,6 +499,9 @@
         <button class="btn ghost" data-act="discard">${h(t("discard"))}</button>`;
     } else if (it.state === "undo_window") {
       acts = `<button class="btn primary" data-act="undo">${h(t("undo"))}</button>`;
+    } else if (it.state === "blocked") {
+      acts = `<button class="btn" data-act="edit">${h(t("edit"))}</button>
+        <button class="btn ghost" data-act="cancel">${h(t("cancelSchedule"))}</button>`;
     } else if (it.state === "ready") {
       acts = `<a class="btn primary" href="${h(it.eml_url)}" download="${h(it.eml_name)}">${h(t("download"))}</a>
         <button class="btn" data-act="copy">${h(t("copyPath"))}</button>
@@ -509,6 +512,7 @@
     }
     return `<h2 class="mh">${h(it.subject || t("noSubject"))}</h2>
       <p class="muted" style="margin:0 0 6px">${badge(it)} · ${h(it.created_by === "agent" ? t("byAgent") : t("byUser"))}</p>
+      ${it.note ? `<div class="ob-note">${h(it.note)}</div>` : ""}
       ${it.state === "ready" ? `<div class="ob-note">${h(t("outboxHint"))}</div>` : ""}
       ${kv}
       ${(it.blocking || []).map((x) => `<div class="ob-block">⛔ ${h(x)}</div>`).join("")}
