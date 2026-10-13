@@ -18,5 +18,6 @@ vault/cards/*.md
 .vscode/
 .pr-review/
 *.log
+.pr-review/
 rules.json
 rules.json.tmp

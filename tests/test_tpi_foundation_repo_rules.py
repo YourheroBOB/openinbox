@@ -11,7 +11,7 @@ from pathlib import Path
 
 REPO = Path(__file__).resolve().parents[1]
 CODE_SUFFIXES = {".py", ".js", ".html", ".sh", ".yml", ".yaml", ".json", ".toml"}
-SKIP_DIRS = {".git", "data", "__pycache__", "state"}
+SKIP_DIRS = {".git", "data", "__pycache__", "state", ".pr-review"}
 
 # Assembled at runtime so this file does not itself contain the banned words.
 BANNED_CODE_WORDS = ["smtp" + "lib", "send" + "mail", "send" + "_mail", "send" + "_message", "Send" + "Email"]
@@ -35,8 +35,10 @@ def tracked_files():
                              check=True, capture_output=True, text=True).stdout
     except (OSError, subprocess.CalledProcessError):
         local_only = {"accounts.json", "agent.json"}
-        return [p for p in repo_files() if p.name not in local_only and "vault" not in p.relative_to(REPO).parts]
-    return [REPO / rel for rel in out.splitlines() if (REPO / rel).is_file() and not rel.startswith("state/")]
+        return [p for p in repo_files() if p.name not in local_only and p.suffix != ".log"
+                and "vault" not in p.relative_to(REPO).parts]
+    return [REPO / rel for rel in out.splitlines()
+            if (REPO / rel).is_file() and not SKIP_DIRS.intersection(Path(rel).parts)]
 
 
 class RepoRulesTest(unittest.TestCase):

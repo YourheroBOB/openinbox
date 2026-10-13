@@ -154,7 +154,7 @@ def load_settings() -> dict:
     enabled = raw.get("enabled") if isinstance(raw.get("enabled"), dict) else {}
     runs = raw.get("runs") if isinstance(raw.get("runs"), dict) else {}
     return {
-        "enabled": {s["slug"]: bool(enabled.get(s["slug"], True)) for s in SKILLS},
+        "enabled": {s["slug"]: enabled.get(s["slug"], True) is True for s in SKILLS},
         "runs": {k: v for k, v in runs.items() if k in BY_SLUG and isinstance(v, dict)},
         "updated_at": raw.get("updated_at") or "",
     }
@@ -173,10 +173,13 @@ def set_enabled(changes: dict) -> tuple[dict, int]:
     unknown = [k for k in changes if k not in BY_SLUG]
     if unknown:
         return {"error": f"unknown skill {', '.join(sorted(unknown))}", "skills": sorted(BY_SLUG)}, 400
+    not_bool = [k for k, v in changes.items() if not isinstance(v, bool)]
+    if not_bool:
+        return {"error": f"enabled must be true or false (JSON boolean) for {', '.join(sorted(not_bool))}"}, 400
     with _lock:
         s = load_settings()
         for k, v in changes.items():
-            s["enabled"][k] = bool(v)
+            s["enabled"][k] = v
         save_settings(s)
     return {"ok": True, "enabled": s["enabled"]}, 200
 
@@ -1351,7 +1354,7 @@ def skills_settings(req):
     if isinstance(b.get("enabled"), dict):
         changes = b["enabled"]
     elif b.get("slug"):
-        changes = {str(b["slug"]): bool(b.get("enabled"))}
+        changes = {str(b["slug"]): b.get("enabled")}
     else:
         return {"error": "send {slug, enabled} or {enabled: {slug: bool}}"}, 400
     out, status = set_enabled(changes)
@@ -1422,7 +1425,9 @@ def contacts_update(req):
         return {"error": f"stage must be one of {', '.join(STAGES)}"}, 400
     with _lock:
         rows = load_contacts()
-        c = next(c for c in rows if c["email"] == email)
+        c = next((c for c in rows if c["email"] == email), None)
+        if c is None:
+            return {"error": "contact not found"}, 404
         if "tags" in b:
             c["tags"] = _clean_tags(b.get("tags"))
         if stage:
