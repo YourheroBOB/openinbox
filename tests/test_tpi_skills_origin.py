@@ -52,10 +52,10 @@ class OriginTest(unittest.TestCase):
         return [
             ("POST", "/api/skills/settings", {"slug": "find-it", "enabled": False}),
             ("POST", "/api/skills/run", {"skill": "organize-inbox"}),
-            ("POST", "/api/skills/crm/update", {"email": CONTACT, "note": "evil note"}),
-            ("POST", "/api/skills/crm/delete", {"email": CONTACT}),
+            ("POST", "/api/crm/contacts/update", {"email": CONTACT, "note": "evil note"}),
+            ("POST", "/api/crm/contacts/delete", {"email": CONTACT}),
             ("POST", "/api/usage/clear", {}),
-            ("GET", "/api/skills/crm", None),
+            ("GET", "/api/crm/contacts", None),
             ("GET", "/api/skills/slides", None),
             ("GET", f"/api/skills/slides/{self.slide}", None),
             ("GET", "/api/usage", None),
@@ -63,7 +63,7 @@ class OriginTest(unittest.TestCase):
 
     def test_cross_origin_refused(self):
         before_settings = srv.get("/api/skills")[1]
-        before_contacts = srv.get("/api/skills/crm")[1]["contacts"]
+        before_contacts = srv.get("/api/crm/contacts")[1]["contacts"]
         for method, path, body in self.routes():
             with self.subTest(method=method, path=path):
                 status, raw = send(method, path, EVIL, body)
@@ -75,7 +75,7 @@ class OriginTest(unittest.TestCase):
         self.assertEqual(status, 403)
         self.assertIn("拒絕跨來源請求", raw.decode())
         self.assertEqual(srv.get("/api/skills")[1]["skills"], before_settings["skills"])
-        after_contacts = srv.get("/api/skills/crm")[1]["contacts"]
+        after_contacts = srv.get("/api/crm/contacts")[1]["contacts"]
         self.assertEqual(after_contacts, before_contacts)
         self.assertTrue(skills.get_contact(CONTACT))
         self.assertNotIn("evil note", json.dumps(after_contacts))
@@ -85,7 +85,7 @@ class OriginTest(unittest.TestCase):
         for origin in ("null", f"http://127.0.0.1:{port + 1}", f"http://127.0.0.1.evil.example:{port}",
                        f"https://127.0.0.1:{port}"):
             with self.subTest(origin=origin):
-                self.assertEqual(send("GET", "/api/skills/crm", origin)[0], 403)
+                self.assertEqual(send("GET", "/api/crm/contacts", origin)[0], 403)
                 self.assertEqual(send("POST", "/api/skills/settings", origin,
                                       {"slug": "find-it", "enabled": False})[0], 403)
         self.assertTrue(skills.is_enabled("find-it"))
@@ -94,7 +94,7 @@ class OriginTest(unittest.TestCase):
         port = srv.SERVER.server_address[1]
         for origin in (own_origin(), f"http://localhost:{port}"):
             for method, path, body in self.routes():
-                if path.endswith("/crm/delete"):
+                if path.endswith("/crm/contacts/delete"):
                     continue
                 with self.subTest(origin=origin, method=method, path=path):
                     status, raw = send(method, path, origin, body)
@@ -102,7 +102,7 @@ class OriginTest(unittest.TestCase):
         status, raw = send("GET", f"/api/skills/slides/{self.slide}", own_origin())
         self.assertIn(b"Secret deck", raw)
         self.assertFalse(skills.is_enabled("find-it"))
-        status, raw = send("POST", "/api/skills/crm/delete", own_origin(), {"email": CONTACT})
+        status, raw = send("POST", "/api/crm/contacts/delete", own_origin(), {"email": CONTACT})
         self.assertEqual(status, 200, raw)
         self.assertIsNone(skills.get_contact(CONTACT))
 
@@ -149,8 +149,8 @@ class CrmRaceTest(unittest.TestCase):
         real_get = skills.get_contact
         skills.get_contact = lambda email: {"email": email}
         self.addCleanup(setattr, skills, "get_contact", real_get)
-        srv.post("/api/skills/crm/delete", {"email": CONTACT})
-        status, out = srv.post("/api/skills/crm/update", {"email": CONTACT, "note": "late"})
+        srv.post("/api/crm/contacts/delete", {"email": CONTACT})
+        status, out = srv.post("/api/crm/contacts/update", {"email": CONTACT, "note": "late"})
         self.assertEqual(status, 404, out)
         self.assertEqual(out["error"], "contact not found")
 

@@ -12,8 +12,9 @@
 Every skill computes a deterministic, extractive result locally (names, dates
 and amounts are copied, never invented). With a BYO agent in agent.json the
 text skills also ask that agent to rewrite the result; the local result stays
-the fallback. A skill switched off in `data/skills.json` refuses to run (403),
-including through /api/v1/agent/run. Nothing here moves, labels or sends mail.
+the fallback. A skill switched off in `data/skills.json` refuses `/api/skills/run` with 403.
+`/api/v1/agent/run` answers 200 with `error: skill_disabled` for the same switch (the core
+route does not change the HTTP status). Nothing here moves, labels or sends mail.
 """
 from __future__ import annotations
 
@@ -33,7 +34,7 @@ import yhbmail
 from features import Raw, get, post
 from features import triage
 from features import usage
-from features._origin import local_origin, refuse
+from features._origin import local_origin, local_read, refuse
 
 SKILLS = [
     {"slug": "morning-brief", "group": "F09", "prompt": "morning-brief", "inputs": ["today"],
@@ -216,8 +217,85 @@ def disabled_error(slug: str, lang: str) -> dict:
 
 # ───────────────────────── shared mail helpers ─────────────────────────
 
-def all_mail(limit: int = 500) -> list[dict]:
-    return yhbmail.list_emails(limit=limit)
+MAIL_CAP = 500
+
+
+def _ensure_mail_state(con) -> None:
+    con.execute(
+        """CREATE TABLE IF NOT EXISTS mail_state (
+            id TEXT PRIMARY KEY,
+            folder TEXT,
+            starred INTEGER,
+            read INTEGER,
+            read_at TEXT,
+            updated_at TEXT
+        )""")
+
+
+def _not_hidden() -> str:
+    return "id NOT IN (SELECT id FROM mail_state WHERE folder IN ('trash', 'purged'))"
+
+
+def all_mail(limit: int = MAIL_CAP) -> list[dict]:
+    return query_mail([], [], limit=limit)
+
+
+def visible_email(item_id: str) -> dict | None:
+    """Cache row, or None when it is missing or the user trashed / permanently deleted it."""
+    row = yhbmail.get_email(item_id)
+    if not row:
+        return None
+    con = yhbmail.db()
+    try:
+        _ensure_mail_state(con)
+        st = con.execute("SELECT folder FROM mail_state WHERE id=?", (item_id,)).fetchone()
+    finally:
+        con.close()
+    if st and (st["folder"] or "") in ("trash", "purged"):
+        return None
+    return row
+
+
+def _py_lower(value) -> str:
+    return value.lower() if isinstance(value, str) else ""
+
+
+def query_mail(where: list[str], args: list, limit: int = MAIL_CAP) -> list[dict]:
+    """Cached mail matching all `where` clauses, newest first, capped at `limit` (default 500).
+
+    Trash and permanently deleted rows (`mail_state.folder` of trash or purged) are left out.
+    Clauses may call tpi_lower(col), which is Python str.lower (SQLite's lower() only folds ASCII),
+    so `instr(tpi_lower(col), ?) > 0` selects exactly the rows a Python `term in col.lower()` would.
+    """
+    clauses = [c for c in where if c]
+    params = list(args)
+    con = yhbmail.db()
+    try:
+        _ensure_mail_state(con)
+        clauses.append(_not_hidden())
+        sql = "SELECT * FROM emails WHERE " + " AND ".join(clauses) + " ORDER BY date_ts DESC LIMIT ?"
+        params.append(max(1, int(limit)))
+        con.create_function("tpi_lower", 1, _py_lower, deterministic=True)
+        rows = [dict(r) for r in con.execute(sql, params)]
+    finally:
+        con.close()
+    for r in rows:
+        r["labels"] = json.loads(r.pop("labels_json", None) or "[]")
+    return rows
+
+
+def _contains_any(cols: tuple[str, ...], needles: list[str], args: list) -> str:
+    needles = [n for n in needles if isinstance(n, str) and n.strip()]
+    if not needles:
+        return "0"
+    hay = " || ' ' || ".join(f"COALESCE({c}, '')" for c in cols)
+    args.extend(needles)
+    return "(" + " OR ".join(f"instr(tpi_lower({hay}), ?) > 0" for _ in needles) + ")"
+
+
+def mail_containing(cols: tuple[str, ...], needles: list[str]) -> list[dict]:
+    args: list = []
+    return query_mail([_contains_any(cols, needles, args)], args)
 
 
 def mail_item(row: dict, lang: str) -> dict:
@@ -495,9 +573,11 @@ def parse_query(q: str) -> dict:
         if key:
             key, val = key.lower(), val.strip('"')
             if key == "from":
-                out["from"].append(val.lower())
+                if val.strip():
+                    out["from"].append(val.lower())
             elif key == "to":
-                out["to"].append(val.lower())
+                if val.strip():
+                    out["to"].append(val.lower())
             elif key == "has" and val.lower() in ("attachment", "attachments", "附件"):
                 out["has_attachment"] = True
             elif key == "is" and val.lower() == "unread":
@@ -561,13 +641,33 @@ def run_find_it(args: dict, lang: str) -> dict:
             return 0
         return score
 
-    rows = all_mail()
+    def candidates(mode: str) -> list[dict]:
+        where, sql_args = [], []
+        for f in p["from"]:
+            where.append(_contains_any(("from_addr",), [f], sql_args))
+        for t in p["to"]:
+            where.append(_contains_any(("to_addr",), [t], sql_args))
+        if p["unread"]:
+            where.append("unread = 1")
+        if p["after"]:
+            where.append("COALESCE(date_ts, 0) >= ?")
+            sql_args.append(p["after"])
+        if p["before"]:
+            where.append("COALESCE(date_ts, 0) < ?")
+            sql_args.append(p["before"])
+        if p["terms"]:
+            cols = ("subject", "from_addr", "snippet", "body_text")
+            if mode == "all":
+                where += [_contains_any(cols, [t], sql_args) for t in p["terms"]]
+            else:
+                where.append(_contains_any(cols, p["terms"], sql_args))
+        return query_mail(where, sql_args)
+
     mode = "all"
-    scored = [(mail_score(r, mode), r) for r in rows]
-    scored = [x for x in scored if x[0] > 0]
+    scored = [x for x in ((mail_score(r, mode), r) for r in candidates(mode)) if x[0] > 0]
     if not scored and len(p["terms"]) > 1:
         mode = "any"
-        scored = [x for x in ((mail_score(r, mode), r) for r in rows) if x[0] > 0]
+        scored = [x for x in ((mail_score(r, mode), r) for r in candidates(mode)) if x[0] > 0]
     scored.sort(key=lambda x: (-x[0], -(x[1].get("date_ts") or 0)))
     first = p["terms"][0] if p["terms"] else ""
     mails = []
@@ -579,10 +679,11 @@ def run_find_it(args: dict, lang: str) -> dict:
     plain = " ".join(p["terms"])
     events = []
     if p["terms"]:
-        for ev in yhbmail.list_events():
+        from features import calendar
+        for ev in calendar.series_choices():
             title = (ev.get("title") or "").lower()
             if any(t in title for t in p["terms"]):
-                events.append({"id": f"cal:{ev['id']}", "title": ev.get("title") or "",
+                events.append({"id": ev["id"], "title": ev.get("title") or "",
                                "start_local": ev.get("start_local") or ""})
     cards = []
     if plain:
@@ -645,8 +746,27 @@ def keywords(title: str) -> dict:
 
 
 def _event_view(ev: dict) -> dict:
-    return {"id": f"cal:{ev['id']}", "title": ev.get("title") or "", "start_local": ev.get("start_local") or "",
+    return {"id": ev.get("id") or "", "title": ev.get("title") or "", "start_local": ev.get("start_local") or "",
             "end_local": ev.get("end_local") or "", "all_day": bool(ev.get("all_day"))}
+
+
+def _match_event(event_id: str, rows: list[dict]) -> dict | None:
+    """Accept local:N, sync:<id>, a bare local id (digits), or the old cal:<events id> alias."""
+    by_id = {r["id"]: r for r in rows if r.get("id")}
+    if event_id in by_id:
+        return by_id[event_id]
+    candidates = []
+    if event_id.startswith("cal:"):
+        rest = event_id[4:]
+        candidates.extend((rest, f"sync:{rest}", f"local:{rest}"))
+    elif event_id.isdigit():
+        candidates.append(f"local:{event_id}")
+    else:
+        candidates.append(f"sync:{event_id}")
+    for key in candidates:
+        if key in by_id:
+            return by_id[key]
+    return None
 
 
 def _event_dt(ev: dict) -> datetime | None:
@@ -661,10 +781,10 @@ def _event_dt(ev: dict) -> datetime | None:
 
 
 def pick_event(event_id: str, ref: datetime) -> tuple[dict | None, str]:
-    events = yhbmail.list_events()
+    from features import calendar
+    events = calendar.series_choices()
     if event_id:
-        eid = event_id[4:] if event_id.startswith("cal:") else event_id
-        return next((e for e in events if e["id"] == eid), None), "chosen"
+        return _match_event(event_id, events), "chosen"
     dated = [(d, e) for e in events if (d := _event_dt(e))]
     upcoming = sorted((x for x in dated if x[0] >= ref), key=lambda x: x[0])
     if upcoming:
@@ -686,7 +806,8 @@ def run_meeting_prep(args: dict, lang: str) -> dict:
                 "message": "行事曆是空的，先按「同步」。" if zh else "The calendar is empty; hit Sync first."}
     kw = keywords(ev.get("title") or "")
     related = []
-    for r in all_mail():
+    cols = ("subject", "from_addr", "snippet", "body_text")
+    for r in (mail_containing(cols, list(kw)) if kw else []):
         hay = f"{r.get('subject') or ''} {r.get('from_addr') or ''} {r.get('snippet') or ''} {r.get('body_text') or ''}".lower()
         score = sum(w for k, w in kw.items() if k in hay)
         if score >= 2:
@@ -753,7 +874,7 @@ def resolve_person(args: dict) -> tuple[str, str]:
     """Returns (query, email) where email may be empty if only a name was given."""
     person = str(args.get("person") or "").strip()
     if not person and args.get("email_id"):
-        row = yhbmail.get_email(str(args["email_id"]))
+        row = visible_email(str(args["email_id"]))
         if row:
             _, addr = triage.sender(row)
             return addr, addr
@@ -762,7 +883,7 @@ def resolve_person(args: dict) -> tuple[str, str]:
         addr = (m.group(1) if m else person).strip().lower()
         return addr, addr
     if person:
-        for r in all_mail():
+        for r in mail_containing(("from_addr",), [person.lower()]):
             name, addr = triage.sender(r)
             if person.lower() in name.lower():
                 return person, addr
@@ -773,7 +894,7 @@ def person_profile(email: str, lang: str) -> dict | None:
     email = email.lower()
     rows = []
     name = ""
-    for r in all_mail():
+    for r in mail_containing(("from_addr", "to_addr"), [email]):
         n, addr = triage.sender(r)
         frm = addr == email
         to = email in (r.get("to_addr") or "").lower()
@@ -972,7 +1093,7 @@ def run_slide(args: dict, lang: str) -> dict:
             return res
         md, source = res["markdown"], f"skill:{inner}"
     elif not md.strip() and args.get("email_id"):
-        row = yhbmail.get_email(str(args["email_id"]))
+        row = visible_email(str(args["email_id"]))
         if not row:
             return {"error": "email not found", "status": 404}
         md, source = email_markdown(row, lang), "email"
@@ -1138,6 +1259,17 @@ def source_label(source: str, driver: str, lang: str) -> str:
     return "本機規則結果（未接 LLM）" if _zh(lang) else "Local rule-based result (no LLM)"
 
 
+def agent_off(value) -> bool:
+    """`agent` arg: missing / "" / "auto" / true -> use the BYO agent; false, 0, "off", "false", "0", "no" -> don't."""
+    if value is None:
+        return False
+    if isinstance(value, bool):
+        return not value
+    if isinstance(value, (int, float)):
+        return value == 0
+    return str(value).strip().lower() in ("off", "false", "0", "no")
+
+
 def run_skill(slug: str, args: dict | None = None, lang: str = "en") -> tuple[dict, int]:
     args = args if isinstance(args, dict) else {}
     if slug not in BY_SLUG:
@@ -1153,8 +1285,7 @@ def run_skill(slug: str, args: dict | None = None, lang: str = "en") -> tuple[di
             return out, status
         driver = triage.agent_driver()
         source, agent_text, agent_error = "heuristic", "", None
-        want = str(args.get("agent") or "auto").lower()
-        if slug in AGENT_SKILLS and driver != "local" and want not in ("off", "false", "0", "no"):
+        if slug in AGENT_SKILLS and driver != "local" and not agent_off(args.get("agent")):
             text, used, agent_error = triage.ask_agent(agent_prompt(slug, out["markdown"], lang), lang)
             if text:
                 source, agent_text, driver = "agent", text[:8000], used
@@ -1247,7 +1378,7 @@ def skills_run(req):
 
 @get("/api/skills/slides")
 def slides_list(req):
-    if not local_origin(req):
+    if not local_read(req):
         return refuse(req.lang_zh())
     folder = slides_dir()
     files = sorted((p for p in folder.glob("*.html") if SLIDE_NAME_RE.match(p.name)),
@@ -1260,7 +1391,7 @@ def slides_list(req):
 
 @get("/api/skills/slides/*")
 def slide_file(req):
-    if not local_origin(req):
+    if not local_read(req):
         return refuse(req.lang_zh())
     name = unquote(req.params)
     path = slides_dir() / name
@@ -1269,9 +1400,9 @@ def slide_file(req):
     return Raw(path.read_bytes(), "text/html; charset=utf-8")
 
 
-@get("/api/skills/crm")
+@get("/api/crm/contacts")
 def contacts_list(req):
-    if not local_origin(req):
+    if not local_read(req):
         return refuse(req.lang_zh())
     q = (req.query.get("q") or "").strip().lower()
     rows = load_contacts()
@@ -1281,7 +1412,7 @@ def contacts_list(req):
     return {"contacts": rows, "file": _rel(contacts_path()), "stages": list(STAGES)}
 
 
-@post("/api/skills/crm/update")
+@post("/api/crm/contacts/update")
 def contacts_update(req):
     if not local_origin(req):
         return refuse(req.lang_zh())
@@ -1310,7 +1441,7 @@ def contacts_update(req):
     return {"ok": True, "contact": c}
 
 
-@post("/api/skills/crm/delete")
+@post("/api/crm/contacts/delete")
 def contacts_delete(req):
     if not local_origin(req):
         return refuse(req.lang_zh())

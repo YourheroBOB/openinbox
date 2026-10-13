@@ -156,7 +156,7 @@
       case "catch-me-up": return input("skHours", t("hours"), "number", f.hours || 72, 'min="1" max="720"');
       case "find-it": return input("skQuery", t("query"), "text", f.query, 'autofocus');
       case "meeting-prep": return `<label>${h(t("event"))}<select id="skEvent"><option value="">${h(t("nextEvent"))}</option>${view.events.map((e) =>
-        `<option value="cal:${h(e.id)}" ${f.event_id === "cal:" + e.id ? "selected" : ""}>${h(shortDT(e.start_local))} · ${h(e.title)}</option>`).join("")}</select></label>`;
+        `<option value="${h(e.id)}" ${f.event_id === e.id ? "selected" : ""}>${h(shortDT(e.start_local || e.start))} · ${h(e.title)}</option>`).join("")}</select></label>`;
       case "brief-person": return input("skPerson", t("person"), "text", f.person ?? selectedSender()) + personHint();
       case "crm-contact": return input("skPerson", t("person"), "text", f.person ?? selectedSender()) + personHint()
         + input("skTags", t("tags"), "text", f.tags)
@@ -207,7 +207,7 @@
     const s = skill(view.current);
     if (!s) { $pane().innerHTML = ""; return; }
     if (s.slug === "meeting-prep" && !view.events.length) {
-      try { view.events = (await getJSON("/api/calendar")).events || []; } catch {}
+      try { view.events = (await getJSON("/api/cal/series")).events || []; } catch {}
     }
     const r = view.result && view.result.skill === s.slug ? view.result : null;
     $pane().innerHTML = `
@@ -309,7 +309,7 @@
     const box = document.getElementById("skContacts");
     if (!box) return;
     let d;
-    try { d = await getJSON("/api/skills/crm"); } catch { return; }
+    try { d = await getJSON("/api/crm/contacts"); } catch { return; }
     const stages = d.stages || view.stages;
     box.innerHTML = (d.contacts || []).map((c) => `
       <div class="sk-ct" data-email="${h(c.email)}">
@@ -333,11 +333,11 @@
     try {
       if (b.dataset.ct === "del") {
         if (!window.confirm(t("delConfirm"))) return;
-        await postJSON("/api/skills/crm/delete", { email });
+        await postJSON("/api/crm/contacts/delete", { email });
         notify(t("deleted"));
       } else {
         const f = (k) => card.querySelector(`[data-f="${k}"]`)?.value || "";
-        await postJSON("/api/skills/crm/update", { email, stage: f("stage"), tags: f("tags"), note: f("note") });
+        await postJSON("/api/crm/contacts/update", { email, stage: f("stage"), tags: f("tags"), note: f("note") });
         notify(t("saved"));
       }
       loadContacts();

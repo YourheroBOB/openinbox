@@ -31,10 +31,40 @@ class MeetingPrepTest(unittest.TestCase):
         self.assertEqual(status, 200, out)
         d = out["data"]
         self.assertEqual(d["picked"], "next")
+        self.assertEqual(d["event"]["title"], "Byte Cloud renewal walkthrough")
+        self.assertTrue(d["event"]["id"].startswith("local:"))
+        self.assertEqual([r["id"].rsplit(":", 1)[-1] for r in d["related"]], ["m8"])
+        self.assertIn("- [ ] Re-read", out["markdown"])
+
+    def test_sync_event_is_addressed_by_its_calendar_id(self):
+        _, out = run("meeting-prep", event_id="sync:demo-cal-2", now="2026-09-18T12:00:00+08:00")
+        d = out["data"]
+        self.assertEqual(d["picked"], "chosen")
+        self.assertEqual(d["event"]["id"], "sync:demo-cal-2")
         self.assertEqual(d["event"]["title"], "Design review with Maya")
         self.assertEqual([r["id"].rsplit(":", 1)[-1] for r in d["related"]], ["m4"])
         self.assertEqual(d["people"], [{"name": "Maya Singh", "email": "maya@studio.example", "emails": 1}])
-        self.assertIn("- [ ] Re-read", out["markdown"])
+
+    def test_new_local_event_is_chosen_and_becomes_next(self):
+        from features import calendar
+        saved, status = calendar.save_event({
+            "title": "Local kickoff with Quinn",
+            "start": "2026-09-18T12:30", "end": "2026-09-18T13:00", "tz": "Asia/Taipei",
+        }, "en", source="local")
+        self.assertEqual(status, 201, saved)
+        eid = saved["event"]["id"]
+        self.assertTrue(eid.startswith("local:"))
+        status, chosen = run("meeting-prep", event_id=eid, now="2026-09-18T12:00:00+08:00")
+        self.assertEqual(status, 200, chosen)
+        self.assertEqual(chosen["data"]["picked"], "chosen")
+        self.assertEqual(chosen["data"]["event"]["id"], eid)
+        self.assertEqual(chosen["data"]["event"]["title"], "Local kickoff with Quinn")
+        status, auto = run("meeting-prep", now="2026-09-18T12:00:00+08:00")
+        self.assertEqual(auto["data"]["picked"], "next")
+        self.assertEqual(auto["data"]["event"]["id"], eid)
+        status, by_number = run("meeting-prep", event_id=eid.split(":", 1)[1], now="2026-09-18T12:00:00+08:00")
+        self.assertEqual(by_number["data"]["event"]["id"], eid)
+        calendar.delete_event(eid, "en")
 
     def test_chosen_event_open_questions(self):
         _, out = run("meeting-prep", event_id="cal:demo-cal-1")
@@ -100,6 +130,47 @@ class BriefPersonTest(unittest.TestCase):
 class SlideTest(unittest.TestCase):
     def setUp(self):
         reset()
+
+    def test_purged_email_is_not_a_slide_source(self):
+        from features import mailops
+        def _clear_state():
+            con = srv.yhbmail.db()
+            con.execute("DELETE FROM mail_state")
+            con.commit()
+            con.close()
+        self.addCleanup(_clear_state)
+        mailops.apply([M1], "purge")
+        status, out = run("slide", email_id=M1)
+        self.assertEqual(status, 404, out)
+
+    def test_cross_site_get_cannot_read_slides_crm_or_usage(self):
+        import urllib.error
+        import urllib.request
+        status, made = run("slide", email_id=M1)
+        self.assertEqual(status, 200, made)
+        run("crm-contact", person="Samira", note="Private CRM note zeta")
+        secret_bits = (b"Private CRM note zeta", b"two lines you want cut", made["data"]["name"].encode())
+
+        def grab(path, headers):
+            req = urllib.request.Request(srv.BASE + path, headers=headers, method="GET")
+            try:
+                with urllib.request.urlopen(req, timeout=10) as r:
+                    return r.status, r.read()
+            except urllib.error.HTTPError as e:
+                return e.code, e.read()
+
+        evil = {"Origin": "https://evil.example", "Sec-Fetch-Site": "cross-site"}
+        for path in ("/api/skills/slides", made["data"]["url"], "/api/crm/contacts", "/api/usage"):
+            code, raw = grab(path, evil)
+            self.assertEqual(code, 403, path)
+            for bit in secret_bits:
+                self.assertNotIn(bit, raw, path)
+        code, raw = grab("/api/usage", {"Sec-Fetch-Site": "cross-site"})
+        self.assertEqual(code, 403)
+        port = srv.SERVER.server_address[1]
+        code, raw = grab("/api/crm/contacts", {"Origin": f"http://127.0.0.1:{port}"})
+        self.assertEqual(code, 200)
+        self.assertIn(b"Private CRM note zeta", raw)
 
     def test_email_to_html_file(self):
         status, out = run("slide", email_id=M1)
@@ -180,19 +251,19 @@ class CrmTest(unittest.TestCase):
 
     def test_contacts_api(self):
         run("crm-contact", person="maya@studio.example")
-        _, listing = srv.get("/api/skills/crm")
+        _, listing = srv.get("/api/crm/contacts")
         self.assertEqual([c["email"] for c in listing["contacts"]], ["maya@studio.example"])
         self.assertEqual(listing["contacts"][0]["stage"], "lead")
-        status, out = srv.post("/api/skills/crm/update", {"email": "maya@studio.example", "stage": "partner",
+        status, out = srv.post("/api/crm/contacts/update", {"email": "maya@studio.example", "stage": "partner",
                                                         "tags": "design", "note": "Contract designer"})
         self.assertEqual(status, 200, out)
         self.assertEqual((out["contact"]["stage"], out["contact"]["tags"]), ("partner", ["design"]))
-        self.assertEqual(srv.get("/api/skills/crm?q=contract")[1]["contacts"][0]["email"], "maya@studio.example")
-        self.assertEqual(srv.get("/api/skills/crm?q=zzz")[1]["contacts"], [])
-        self.assertEqual(srv.post("/api/skills/crm/update", {"email": "maya@studio.example", "stage": "boss"})[0], 400)
-        self.assertEqual(srv.post("/api/skills/crm/update", {"email": "x@nobody.example"})[0], 404)
-        self.assertEqual(srv.post("/api/skills/crm/delete", {"email": "maya@studio.example"})[0], 200)
-        self.assertEqual(srv.post("/api/skills/crm/delete", {"email": "maya@studio.example"})[0], 404)
+        self.assertEqual(srv.get("/api/crm/contacts?q=contract")[1]["contacts"][0]["email"], "maya@studio.example")
+        self.assertEqual(srv.get("/api/crm/contacts?q=zzz")[1]["contacts"], [])
+        self.assertEqual(srv.post("/api/crm/contacts/update", {"email": "maya@studio.example", "stage": "boss"})[0], 400)
+        self.assertEqual(srv.post("/api/crm/contacts/update", {"email": "x@nobody.example"})[0], 404)
+        self.assertEqual(srv.post("/api/crm/contacts/delete", {"email": "maya@studio.example"})[0], 200)
+        self.assertEqual(srv.post("/api/crm/contacts/delete", {"email": "maya@studio.example"})[0], 404)
         self.assertEqual(skills.load_contacts(), [])
 
     def test_crm_shows_up_in_brief(self):

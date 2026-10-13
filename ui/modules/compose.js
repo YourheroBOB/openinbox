@@ -321,8 +321,16 @@
       renderComposer();
       if (typeof refreshCounts === "function") refreshCounts();
       if (state.view === "drafts" && typeof loadDrafts === "function") loadDrafts();
-    } catch (e) { notify(t("failed") + e.message, true); setBusy(""); }
+      return r.draft;
+    } catch (e) { notify(t("failed") + e.message, true); setBusy(""); return null; }
   }
+  /* for other modules (outbox): save the open draft, then close without the unsaved-changes prompt */
+  window.tpiComposer = {
+    isOpen: () => cmp.open,
+    save: () => (cmp.open ? saveDraft() : Promise.resolve(null)),
+    close: () => closeComposer(true),
+    open: openComposer,
+  };
 
   back.addEventListener("click", async (ev) => {
     if (ev.target === back) return closeComposer();

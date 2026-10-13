@@ -16,6 +16,7 @@ vault/cards/*.md
 !vault/cards/.gitkeep
 .idea/
 .vscode/
+.pr-review/
 *.log
 .pr-review/
 rules.json

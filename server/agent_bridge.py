@@ -239,9 +239,19 @@ def _cli(pack: dict, cfg: dict) -> str:
     timeout = int(block.get("timeout_sec") or 120)
     prompt = json.dumps(pack, ensure_ascii=False)[:24000]
     p = subprocess.run(cmd, input=prompt, capture_output=True, text=True, timeout=timeout)
+    note_cli_exit(p.returncode)
     if p.returncode != 0:
         raise RuntimeError(p.stderr.strip() or f"cli exit {p.returncode}")
     return p.stdout.strip()
+
+
+def note_cli_exit(code: int) -> None:
+    """Hook for the CLI process exit code. `features.usage` replaces this.
+
+    The subprocess module itself stays untouched, so other callers of
+    `subprocess` in this module are not intercepted.
+    """
+    return None
 
 
 def _http(pack: dict, cfg: dict) -> str:

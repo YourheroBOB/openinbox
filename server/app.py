@@ -206,8 +206,15 @@ class Handler(BaseHTTPRequestHandler):
 Handler = features.mount(Handler)
 
 
+def start_background() -> None:
+    """Server start, not import. Tests call stop_ticker(); OPENINBOX_OUTBOX_TICK=0 keeps it off."""
+    from features import outbox
+    outbox.start_ticker()
+
+
 def main() -> None:
     boot()
+    start_background()
     httpd = ThreadingHTTPServer(("127.0.0.1", PORT), Handler)
     url = f"http://127.0.0.1:{PORT}/"
     print(f"TooPowerInbox  {url}", flush=True)
