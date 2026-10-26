@@ -188,7 +188,11 @@ def upsert_email(con: sqlite3.Connection, item: dict, preserve_read_state: bool 
     ts = item.get("date_ts") or parse_date_ts(item.get("date_raw") or "")
     body_val = _body_text_value(item)
     if preserve_read_state:
-        unread_sql = "CASE WHEN emails.unread=0 THEN emails.unread ELSE excluded.unread END"
+        unread_sql = (
+            "CASE WHEN emails.unread=1 THEN 1 "
+            "WHEN emails.unread=0 THEN 0 "
+            "ELSE excluded.unread END"
+        )
         cat_sql = "CASE WHEN emails.unread=0 THEN emails.category ELSE excluded.category END"
         reason_sql = "CASE WHEN emails.unread=0 THEN emails.flag_reason ELSE excluded.flag_reason END"
     else:
@@ -332,7 +336,6 @@ def sync_all(limit: int = 25) -> dict:
     accounts = cfg.get("accounts") or []
     if mode == "demo" or not accounts or all(a.get("driver") == "demo" for a in accounts):
         return seed_demo()
-    purge_demo_rows()
     report = {"ok": True, "mode": "live", "accounts": []}
     for acc in accounts:
         started = datetime.now()
@@ -357,6 +360,8 @@ def sync_all(limit: int = 25) -> dict:
         except Exception as e:
             report["accounts"].append({"email": acc.get("email"), "error": str(e)[:300]})
             report["ok"] = False
+    if any(not a.get("error") for a in report["accounts"]):
+        purge_demo_rows()
     LAST_SYNC.clear()
     LAST_SYNC.update({"at": now_iso(), **report})
     return report

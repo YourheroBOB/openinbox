@@ -502,7 +502,7 @@
         const row = $("list").querySelector(`.row[data-id="${CSS.escape(id)}"]`); if (row) row.classList.remove("unread");
       }
       renderCpContext();
-      const snippetOnly = !data.body_text && !!data.snippet;
+      const snippetOnly = state.cfg?.mode === "live" && !data.body_text && !!data.snippet;
       const body = data.body_text || data.snippet || "";
       const long = body.length > 700;
       const isMd = /(^|\n)\s{0,3}(#{1,4}\s|\*\*|[-*]\s|\d+\.\s|>\s)/.test(body.slice(0, 400));

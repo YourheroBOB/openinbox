@@ -55,15 +55,20 @@ def rebuild() -> dict:
         },
         "how_you_write": how_write,
         "how_you_run_inbox": how_run,
-        "attention_now": seed.get("attention_now") or [
-            t["text"] for t in (board["todos"].get("needs_you") or [])[:4]
-        ],
+        "attention_now": (
+            seed.get("attention_now")
+            or [t["text"] for t in (board["todos"].get("needs_you") or [])[:4]]
+            if mode == "demo"
+            else [t["text"] for t in (board["todos"].get("needs_you") or [])[:4]]
+        ),
         "inbox_priorities": [
             {"category": k, "count": cats.get(k, 0)}
             for k in ("needs_you", "upcoming", "worth_a_look", "fyi", "other")
         ],
         "top_senders": [{"email": e, "count": n} for e, n in senders.most_common(8)],
-        "facts_learned": len(emails) + len(seed.get("how_you_write") or []),
+        "facts_learned": len(emails) + (
+            len(seed.get("how_you_write") or []) if mode == "demo" else 0
+        ),
         "source": "demo-seed+local-mail" if mode == "demo" and seed else "local-mail",
     }
     PERSONA_PATH.parent.mkdir(parents=True, exist_ok=True)
