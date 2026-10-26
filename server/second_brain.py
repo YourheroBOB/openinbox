@@ -35,6 +35,8 @@ def _write_card(card: dict) -> dict:
 
 
 def rebuild() -> dict:
+    prior = load().get("cards") if INDEX.exists() else []
+    note_cards = [c for c in (prior or []) if (c.get("kind") or "") == "note"]
     board = brain_board(720)
     cards = []
     for cat in ("needs_you", "worth_a_look", "upcoming"):
@@ -65,8 +67,11 @@ def rebuild() -> dict:
             "updated_at": now_iso(),
             "body": f"{ev.get('start_local')} → {ev.get('end_local')}",
         }))
-    # de-dupe by id, keep last
+    # de-dupe by id, keep last; preserve user notes from prior index
     uniq = {c["id"]: c for c in cards}
+    for note in note_cards:
+        if note.get("id") and note["id"] not in uniq:
+            uniq[note["id"]] = note
     cards = list(uniq.values())
     INDEX.write_text(json.dumps({"updated_at": now_iso(), "count": len(cards), "cards": cards},
                                 ensure_ascii=False, indent=2))

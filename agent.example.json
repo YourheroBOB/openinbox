@@ -4,7 +4,8 @@
   "openai_compatible": {
     "base_url": "http://127.0.0.1:11434/v1",
     "model": "llama3.1",
-    "api_key_env": "OPENAI_API_KEY"
+    "api_key_env": "OPENAI_API_KEY",
+    "allow_private": true
   },
   "cli": {
     "command": ["claude", "-p"],
@@ -12,6 +13,7 @@
   },
   "http": {
     "url": "http://127.0.0.1:9000/agent",
-    "timeout_sec": 60
+    "timeout_sec": 60,
+    "allow_private": true
   }
 }

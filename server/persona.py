@@ -27,21 +27,34 @@ def rebuild() -> dict:
         cats[e.get("category") or "fyi"] += 1
     seed = _seed()
     cfg = load_cfg()
+    mode = cfg.get("mode") or "demo"
+    accounts = cfg.get("accounts") or []
+    if mode == "demo":
+        identity_name = seed.get("name") or "You"
+        identity_role = seed.get("role") or "Inbox owner"
+        how_write = seed.get("how_you_write") or [
+            "Learned from sent mail once a live driver is connected.",
+        ]
+        how_run = seed.get("how_you_run_inbox") or [
+            "Needs-you items first, then money, then the rest.",
+        ]
+    else:
+        primary = accounts[0] if accounts else {}
+        identity_name = primary.get("label") or (primary.get("email") or "You").split("@")[0] or "You"
+        identity_role = "Inbox owner"
+        how_write = ["Learned from sent mail once a live driver is connected."]
+        how_run = ["Needs-you items first, then money, then the rest."]
     persona = {
         "updated_at": now_iso(),
-        "mode": cfg.get("mode") or "demo",
+        "mode": mode,
         "identity": {
-            "name": seed.get("name") or "You",
-            "role": seed.get("role") or "Inbox owner",
-            "timezone": seed.get("timezone") or "local",
-            "accounts": [a.get("email") for a in (cfg.get("accounts") or [])],
+            "name": identity_name,
+            "role": identity_role,
+            "timezone": (seed.get("timezone") if mode == "demo" else None) or "local",
+            "accounts": [a.get("email") for a in accounts],
         },
-        "how_you_write": seed.get("how_you_write") or [
-            "Learned from sent mail once a live driver is connected.",
-        ],
-        "how_you_run_inbox": seed.get("how_you_run_inbox") or [
-            "Needs-you items first, then money, then the rest.",
-        ],
+        "how_you_write": how_write,
+        "how_you_run_inbox": how_run,
         "attention_now": seed.get("attention_now") or [
             t["text"] for t in (board["todos"].get("needs_you") or [])[:4]
         ],
@@ -51,7 +64,7 @@ def rebuild() -> dict:
         ],
         "top_senders": [{"email": e, "count": n} for e, n in senders.most_common(8)],
         "facts_learned": len(emails) + len(seed.get("how_you_write") or []),
-        "source": "demo-seed+local-mail" if seed else "local-mail",
+        "source": "demo-seed+local-mail" if mode == "demo" and seed else "local-mail",
     }
     PERSONA_PATH.parent.mkdir(parents=True, exist_ok=True)
     PERSONA_PATH.write_text(json.dumps(persona, ensure_ascii=False, indent=2))

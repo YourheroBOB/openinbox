@@ -18,12 +18,14 @@ sys.path.insert(0, str(HERE))
 
 import agent_bridge  # noqa: E402
 import features  # noqa: E402
+import http_guard  # noqa: E402
 import persona  # noqa: E402
 import second_brain  # noqa: E402
 import yhbmail  # noqa: E402
 
 PORT = int(os.environ.get("OPENINBOX_PORT", "8770"))
 UI = ROOT / "ui"
+MAX_JSON_BODY = 1 * 1024 * 1024
 _sync = {"running": False, "last": None, "error": None}
 
 
@@ -32,25 +34,35 @@ def json_ok(handler, payload, status=200):
     handler.send_response(status)
     handler.send_header("Content-Type", "application/json; charset=utf-8")
     handler.send_header("Cache-Control", "no-store")
-    handler.send_header("Access-Control-Allow-Origin", "*")
     handler.send_header("Content-Length", str(len(raw)))
     handler.end_headers()
     handler.wfile.write(raw)
 
 
-def read_body(handler) -> dict:
-    n = int(handler.headers.get("Content-Length") or 0)
-    if n <= 0:
-        return {}
+def read_json(handler) -> tuple[dict | None, int | None]:
+    raw_len = handler.headers.get("Content-Length")
     try:
-        return json.loads(handler.rfile.read(n).decode())
-    except json.JSONDecodeError:
-        return {}
+        n = int(raw_len) if raw_len not in (None, "") else 0
+    except ValueError:
+        return None, 413
+    if n < 0 or n > MAX_JSON_BODY:
+        return None, 413
+    if n <= 0:
+        return {}, None
+    try:
+        data = json.loads(handler.rfile.read(n).decode())
+    except (json.JSONDecodeError, UnicodeDecodeError):
+        return None, 400
+    if not isinstance(data, dict):
+        return None, 400
+    return data, None
 
 
 def boot() -> None:
     yhbmail.init_db()
-    yhbmail.seed_demo()
+    cfg = yhbmail.load_cfg()
+    if (cfg.get("mode") or "demo") == "demo":
+        yhbmail.seed_demo()
     persona.rebuild()
     second_brain.rebuild()
 
@@ -60,10 +72,7 @@ class Handler(BaseHTTPRequestHandler):
         return
 
     def do_OPTIONS(self):
-        self.send_response(204)
-        self.send_header("Access-Control-Allow-Origin", "*")
-        self.send_header("Access-Control-Allow-Methods", "GET,POST,OPTIONS")
-        self.send_header("Access-Control-Allow-Headers", "Content-Type")
+        self.send_response(405)
         self.end_headers()
 
     def do_GET(self):
@@ -79,13 +88,25 @@ class Handler(BaseHTTPRequestHandler):
             self.wfile.write(html)
             return
         if path == "/api/health":
-            cfg = yhbmail.load_cfg()
-            return json_ok(self, {
-                "ok": True, "name": "TooPowerInbox", "port": PORT,
+            cfg_err = None
+            try:
+                cfg = yhbmail.load_cfg()
+                agent_driver = agent_bridge.load_agent_cfg().get("driver")
+                ok = True
+            except Exception:
+                cfg = {"mode": "unknown"}
+                agent_driver = None
+                ok = False
+                cfg_err = "configuration unreadable"
+            payload = {
+                "ok": ok, "name": "TooPowerInbox", "port": PORT,
                 "mode": cfg.get("mode") or "demo",
                 "sync": _sync, "counts": yhbmail.counts(),
-                "agent": agent_bridge.load_agent_cfg().get("driver"),
-            })
+                "agent": agent_driver,
+            }
+            if cfg_err:
+                payload["config_error"] = cfg_err
+            return json_ok(self, payload)
         if path == "/api/overview":
             cfg = agent_bridge.load_agent_cfg()
             return json_ok(self, {
@@ -98,9 +119,14 @@ class Handler(BaseHTTPRequestHandler):
                 "agent": {"driver": cfg.get("driver") or "local"},
             })
         if path == "/api/inbox":
+            try:
+                lim = int(q.get("limit") or 80)
+            except (TypeError, ValueError):
+                return json_ok(self, {"error": "bad limit"}, 400)
+            lim = max(1, min(lim, 200))
             return json_ok(self, {"emails": yhbmail.list_emails(
                 account=q.get("account"), category=q.get("category"),
-                q=q.get("q"), limit=int(q.get("limit") or 80))})
+                q=q.get("q"), limit=lim)})
         if path == "/api/accounts":
             cfg = yhbmail.load_cfg()
             return json_ok(self, {
@@ -117,7 +143,12 @@ class Handler(BaseHTTPRequestHandler):
             item = yhbmail.get_email(unquote(path[len("/api/thread/"):]))
             return json_ok(self, item or {"error": "not found"}, 200 if item else 404)
         if path == "/api/brain":
-            return json_ok(self, yhbmail.brain_board(int(q.get("hours") or 168)))
+            try:
+                hours = int(q.get("hours") or 168)
+            except (TypeError, ValueError):
+                return json_ok(self, {"error": "bad hours"}, 400)
+            hours = max(1, min(hours, 24 * 365))
+            return json_ok(self, yhbmail.brain_board(hours))
         if path == "/api/calendar":
             return json_ok(self, {"events": yhbmail.list_events()})
         if path == "/api/persona":
@@ -133,20 +164,42 @@ class Handler(BaseHTTPRequestHandler):
 
     def do_POST(self):
         path = urlparse(self.path).path
-        body = read_body(self)
+        if not http_guard.state_change_ok(self):
+            return json_ok(self, {"error": "cross-origin request refused"}, 403)
+        body, body_err = read_json(self)
+        if body_err:
+            return json_ok(self, {"error": "bad request body"}, body_err)
         if path == "/api/sync":
+            if _sync["running"]:
+                return json_ok(self, {"ok": False, "started": False, "error": "sync already running"}, 409)
+            try:
+                limit = int(body.get("limit") or 25)
+            except (TypeError, ValueError):
+                return json_ok(self, {"error": "bad limit"}, 400)
+            limit = max(1, min(limit, 100))
+
             def job():
                 _sync["running"] = True
+                prev_last = _sync["last"]
                 try:
-                    yhbmail.sync_all(int(body.get("limit") or 25))
+                    report = yhbmail.sync_all(limit)
                     persona.rebuild()
                     second_brain.rebuild()
-                    _sync["last"] = yhbmail.now_iso()
-                    _sync["error"] = None
+                    errs = [
+                        f"{a.get('email') or '?'}: {a.get('error')}"
+                        for a in (report.get("accounts") or []) if a.get("error")
+                    ]
+                    if errs or not report.get("ok", True):
+                        _sync["error"] = ("; ".join(errs) or "sync failed")[:300]
+                    else:
+                        _sync["last"] = yhbmail.now_iso()
+                        _sync["error"] = None
                 except Exception as e:
                     _sync["error"] = str(e)[:300]
+                    _sync["last"] = prev_last
                 finally:
                     _sync["running"] = False
+
             threading.Thread(target=job, daemon=True).start()
             return json_ok(self, {"ok": True, "started": True})
         if path in ("/api/agent", "/api/v1/agent/run"):
@@ -190,6 +243,8 @@ class Handler(BaseHTTPRequestHandler):
         return json_ok(self, {"error": "not found"}, 404)
 
     def do_DELETE(self):
+        if not http_guard.state_change_ok(self):
+            return json_ok(self, {"error": "cross-origin request refused"}, 403)
         parsed = urlparse(self.path)
         q = {k: v[0] for k, v in parse_qs(parsed.query).items()}
         if parsed.path == "/api/draft":

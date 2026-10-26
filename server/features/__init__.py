@@ -139,11 +139,6 @@ def _write(handler, body: bytes, content_type: str, status: int) -> None:
     handler.send_response(status)
     handler.send_header("Content-Type", content_type)
     handler.send_header("Cache-Control", "no-store")
-    path = urlparse(getattr(handler, "path", "") or "").path
-    # Outbox responses carry recipients and message text. The UI is same-origin and does not
-    # need this header; leaving it off stops another site from reading the body.
-    if not path.startswith("/api/outbox/"):
-        handler.send_header("Access-Control-Allow-Origin", "*")
     handler.send_header("Content-Length", str(len(body)))
     handler.end_headers()
     handler.wfile.write(body)
