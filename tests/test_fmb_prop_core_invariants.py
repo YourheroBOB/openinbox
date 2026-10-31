@@ -1,6 +1,7 @@
 """核心函式的性質式與表格驅動不變量測試。
 
-只使用 Python 標準庫；不連線、不接觸正式服務。檔案系統測試一律在暫存資料夾中執行。
+只使用 Python 標準庫；不連線、不接觸正式服務。檔案系統測試一律在暫存資料夾中執行，
+且把 Second Brain 內所有指向其 ROOT 的儲存路徑一併導向暫存目錄，避免污染 repo。
 """
 from __future__ import annotations
 
@@ -9,7 +10,7 @@ import random
 import sys
 import tempfile
 import unittest
-from contextlib import contextmanager
+from contextlib import ExitStack, contextmanager
 from pathlib import Path
 from unittest import mock
 
@@ -45,6 +46,7 @@ class AgentMentionPropertyTests(unittest.TestCase):
                         parsed = agents.parse_mention(text)
 
                         self.assertIsNotNone(parsed)
+                        self.assertIsInstance(parsed, dict)
                         self.assertEqual(parsed["kind"], expected_kind)
                         self.assertEqual(parsed["word"], word)
                         self.assertIn(target, parsed["target"])
@@ -88,13 +90,17 @@ class AgentMentionPropertyTests(unittest.TestCase):
         self.assertEqual(first_wins["kind"], "research_person")
 
         marker = "@agent Sample Person"
-        at_limit = " " * (agents.MAX_BODY - len(marker)) + marker
-        after_limit = " " * agents.MAX_BODY + marker
+        max_body = int(getattr(agents, "MAX_BODY"))
+        self.assertGreater(max_body, len(marker))
+
+        at_limit = " " * (max_body - len(marker)) + marker
+        after_limit = " " * max_body + marker
 
         parsed_at_limit = agents.parse_mention(at_limit)
         self.assertIsNotNone(parsed_at_limit)
         self.assertEqual(parsed_at_limit["word"], "agent")
         self.assertIsNone(agents.parse_mention(after_limit))
+        self.assertIsNone(agents.parse_mention(" " * (max_body * 2) + marker))
 
     def test_agent_alias_matching_is_exact(self):
         cases = (
@@ -176,21 +182,57 @@ class AgentMentionPropertyTests(unittest.TestCase):
                 self.assertFalse(agents._valid_id(did))
 
 
+#: Second Brain 可能存在的儲存路徑常數；只有實際存在、且值落在其 ROOT 之下時才導向暫存目錄。
+STORAGE_PATH_ATTRS = {
+    "ROOT": "root",
+    "VAULT": "vault",
+    "VAULT_DIR": "vault",
+    "CARDS": "cards",
+    "CARDS_DIR": "cards",
+    "INDEX": "index",
+    "INDEX_FILE": "index",
+    "INDEX_PATH": "index",
+    "BACKUPS": "backups",
+    "EXPORTS": "exports",
+    "ATTACHMENTS": "attachments",
+}
+
+
 @contextmanager
 def isolated_second_brain(root: Path):
     """將 Second Brain 的所有寫入導向暫存根目錄。"""
     vault = root / "vault"
     cards = vault / "cards"
     index = vault / "index.json"
+    targets = {
+        "root": root,
+        "vault": vault,
+        "cards": cards,
+        "index": index,
+        "backups": root / "backups",
+        "exports": root / "exports",
+        "attachments": root / "attachments",
+    }
     vault.mkdir(parents=True, exist_ok=True)
     index.write_text(
         json.dumps({"updated_at": "2026-01-01T00:00:00+00:00", "count": 0, "cards": []}),
         encoding="utf-8",
     )
 
-    with mock.patch.object(second_brain, "ROOT", root), \
-            mock.patch.object(second_brain, "CARDS", cards), \
-            mock.patch.object(second_brain, "INDEX", index):
+    original_root = Path(getattr(second_brain, "ROOT", root))
+
+    with ExitStack() as stack:
+        for attr, key in STORAGE_PATH_ATTRS.items():
+            current = getattr(second_brain, attr, None)
+            if not isinstance(current, (str, Path)):
+                continue
+            if attr != "ROOT":
+                try:
+                    Path(current).relative_to(original_root)
+                except ValueError:
+                    # 非 ROOT 派生的路徑（例如隨附的唯讀資源）不動它。
+                    continue
+            stack.enter_context(mock.patch.object(second_brain, attr, targets[key]))
         yield cards, index
 
 
@@ -208,10 +250,12 @@ class SecondBrainPropertyTests(unittest.TestCase):
                     "Repeatable Card", "stable body"
                 )
 
+                self.assertTrue(str(first["id"]))
                 self.assertEqual(first["id"], second["id"])
                 self.assertEqual(first["body"], second["body"])
 
                 loaded = second_brain.load()
+                self.assertEqual(loaded["count"], len(loaded["cards"]))
                 self.assertEqual(loaded["count"], 1)
                 self.assertEqual(len(loaded["cards"]), 1)
                 self.assertEqual(loaded["cards"][0]["id"], first["id"])
@@ -229,6 +273,7 @@ class SecondBrainPropertyTests(unittest.TestCase):
                 )
                 loaded = second_brain.load()
                 self.assertEqual(updated["id"], first["id"])
+                self.assertEqual(loaded["count"], len(loaded["cards"]))
                 self.assertEqual(loaded["count"], 1)
                 self.assertEqual(len(loaded["cards"]), 1)
                 self.assertEqual(loaded["cards"][0]["body"], "updated body")
@@ -283,9 +328,9 @@ class SecondBrainPropertyTests(unittest.TestCase):
                 for query, expected in cases:
                     with self.subTest(query=query):
                         results = second_brain.search(query)
-                        self.assertEqual(
-                            {card["id"] for card in results}, expected
-                        )
+                        ids = {card["id"] for card in results}
+                        self.assertEqual(len(results), len(ids))
+                        self.assertEqual(ids, expected)
                         for card in results:
                             blob = (
                                 f"{card.get('title') or ''} "
