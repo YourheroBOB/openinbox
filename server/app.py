@@ -6,6 +6,7 @@ import json
 import os
 import sys
 import threading
+import types
 import webbrowser
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
@@ -21,10 +22,12 @@ import features  # noqa: E402
 import persona  # noqa: E402
 import second_brain  # noqa: E402
 import yhbmail  # noqa: E402
+from features import _origin  # noqa: E402
 
 PORT = int(os.environ.get("OPENINBOX_PORT", "8770"))
 UI = ROOT / "ui"
 _sync = {"running": False, "last": None, "error": None}
+_sync_lock = threading.Lock()
 
 
 def json_ok(handler, payload, status=200):
@@ -32,20 +35,44 @@ def json_ok(handler, payload, status=200):
     handler.send_response(status)
     handler.send_header("Content-Type", "application/json; charset=utf-8")
     handler.send_header("Cache-Control", "no-store")
-    handler.send_header("Access-Control-Allow-Origin", "*")
+    # Only the liveness probe stays readable by other origins; mail, drafts and agent output do not.
+    if urlparse(getattr(handler, "path", "") or "").path == "/api/health":
+        handler.send_header("Access-Control-Allow-Origin", "*")
     handler.send_header("Content-Length", str(len(raw)))
     handler.end_headers()
     handler.wfile.write(raw)
 
 
 def read_body(handler) -> dict:
-    n = int(handler.headers.get("Content-Length") or 0)
+    try:
+        n = int(handler.headers.get("Content-Length") or 0)
+    except ValueError:
+        return {}
     if n <= 0:
         return {}
     try:
-        return json.loads(handler.rfile.read(n).decode())
-    except json.JSONDecodeError:
+        data = json.loads(handler.rfile.read(n).decode())
+    except (json.JSONDecodeError, UnicodeDecodeError):
         return {}
+    return data if isinstance(data, dict) else {}
+
+
+def int_arg(value, default: int, lo: int = 1, hi: int = 1000) -> int:
+    try:
+        n = int(value) if value not in (None, "") else default
+    except (TypeError, ValueError):
+        n = default
+    return max(lo, min(hi, n))
+
+
+def _same_origin(handler, read: bool = False) -> bool:
+    req = types.SimpleNamespace(handler=handler)
+    return _origin.local_read(req) if read else _origin.local_origin(req)
+
+
+def _refuse(handler, lang=None) -> None:
+    body, status = _origin.refuse(str(lang or "").lower().startswith("zh"))
+    json_ok(handler, body, status)
 
 
 def boot() -> None:
@@ -60,10 +87,10 @@ class Handler(BaseHTTPRequestHandler):
         return
 
     def do_OPTIONS(self):
+        # The UI is same-origin and never preflights; granting CORS here would let any web page
+        # call the local API with JSON bodies.
         self.send_response(204)
-        self.send_header("Access-Control-Allow-Origin", "*")
-        self.send_header("Access-Control-Allow-Methods", "GET,POST,OPTIONS")
-        self.send_header("Access-Control-Allow-Headers", "Content-Type")
+        self.send_header("Allow", "GET,POST,DELETE,OPTIONS")
         self.end_headers()
 
     def do_GET(self):
@@ -78,6 +105,8 @@ class Handler(BaseHTTPRequestHandler):
             self.end_headers()
             self.wfile.write(html)
             return
+        if path != "/api/health" and not _same_origin(self, read=True):
+            return _refuse(self, q.get("lang"))
         if path == "/api/health":
             cfg = yhbmail.load_cfg()
             return json_ok(self, {
@@ -100,7 +129,7 @@ class Handler(BaseHTTPRequestHandler):
         if path == "/api/inbox":
             return json_ok(self, {"emails": yhbmail.list_emails(
                 account=q.get("account"), category=q.get("category"),
-                q=q.get("q"), limit=int(q.get("limit") or 80))})
+                q=q.get("q"), limit=int_arg(q.get("limit"), 80))})
         if path == "/api/accounts":
             cfg = yhbmail.load_cfg()
             return json_ok(self, {
@@ -117,7 +146,7 @@ class Handler(BaseHTTPRequestHandler):
             item = yhbmail.get_email(unquote(path[len("/api/thread/"):]))
             return json_ok(self, item or {"error": "not found"}, 200 if item else 404)
         if path == "/api/brain":
-            return json_ok(self, yhbmail.brain_board(int(q.get("hours") or 168)))
+            return json_ok(self, yhbmail.brain_board(int_arg(q.get("hours"), 168, hi=24 * 366)))
         if path == "/api/calendar":
             return json_ok(self, {"events": yhbmail.list_events()})
         if path == "/api/persona":
@@ -134,11 +163,18 @@ class Handler(BaseHTTPRequestHandler):
     def do_POST(self):
         path = urlparse(self.path).path
         body = read_body(self)
+        if not _same_origin(self):
+            return _refuse(self, body.get("lang"))
         if path == "/api/sync":
-            def job():
+            limit = int_arg(body.get("limit"), 25, hi=500)
+            with _sync_lock:
+                if _sync["running"]:
+                    return json_ok(self, {"ok": True, "started": False, "running": True})
                 _sync["running"] = True
+
+            def job():
                 try:
-                    yhbmail.sync_all(int(body.get("limit") or 25))
+                    yhbmail.sync_all(limit)
                     persona.rebuild()
                     second_brain.rebuild()
                     _sync["last"] = yhbmail.now_iso()
@@ -192,6 +228,8 @@ class Handler(BaseHTTPRequestHandler):
     def do_DELETE(self):
         parsed = urlparse(self.path)
         q = {k: v[0] for k, v in parse_qs(parsed.query).items()}
+        if not _same_origin(self):
+            return _refuse(self, q.get("lang"))
         if parsed.path == "/api/draft":
             try:
                 draft_id = int(q.get("id") or 0)

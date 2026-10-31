@@ -1,6 +1,7 @@
 """Second Brain: durable cards distilled from mail, calendar, and agent runs."""
 from __future__ import annotations
 
+import hashlib
 import json
 import re
 from pathlib import Path
@@ -13,7 +14,12 @@ INDEX = ROOT / "vault" / "index.json"
 
 def _slug(text: str) -> str:
     s = re.sub(r"[^a-zA-Z0-9\u4e00-\u9fff]+", "-", (text or "card").lower()).strip("-")
-    return (s[:48] or "card")
+    if len(s) > 48:
+        # Long mail ids share a long account prefix; plain truncation made different messages
+        # collide on one card file. Keep a digest of the full text so each stays unique.
+        digest = hashlib.sha1((text or "").encode("utf-8")).hexdigest()[:10]
+        return f"{s[:37].rstrip('-')}-{digest}"
+    return s or "card"
 
 
 def _write_card(card: dict) -> dict:
