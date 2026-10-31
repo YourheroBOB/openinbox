@@ -112,7 +112,7 @@ flowchart TB
 | Email Brain | `email_brain.py` | 身分職場、寫作語氣、關係、專案、注意力與可修正推論 |
 | 搜尋與聯絡人 | `search.py`、`contacts.py` | FTS5／LIKE 搜尋、自然語言運算式解析、索引重建、聯絡人彙整 |
 | 撰寫與草稿 | `compose.py` | 新信、回覆、轉寄草稿、AI Write、語氣、風格、字型與聲音樣本 |
-| Outbox | `outbox.py`、`_outbox_transport.py` | 人工確認、排程、取消、倒數撤销、EML 匯出與本機 outbox 狀態 |
+| Outbox | `outbox.py`、`_outbox_transport.py` | 人工確認、排程、取消、倒數撤銷、EML 匯出與本機 outbox 狀態 |
 | 行事曆 | `calendar.py`、`_ics.py` | 事件 CRUD、檢視、時區、RSVP、同事 ICS、free/busy 與邀請草稿 |
 | 郵件操作 | `mailops.py` | 資料夾、已讀、星號、封存、刪除、移動、列印、翻譯、通知與帳號設定 |
 | 追蹤與自動化 | `followup.py`、`rules.py`、`overnight.py` | 未回覆追蹤、規則 dry-run、夜班分流、備妥草稿與晨間交接 |
@@ -329,7 +329,7 @@ MCP 服務是獨立的 stdio 程序，不需要先啟動網頁面板。它提供
 
 ### 6.1 HTTP 介面
 
-| 類型 |  代表端點 | 說明 |
+| 類型 | 代表端點 | 說明 |
 |---|---|---|
 | 核心健康與收件匣 | `/api/health`、`/api/inbox` | 本機快取狀態與統一收件匣 |
 | Copilot 與草稿 | `/api/copilot`、`/api/drafts`、`/api/draft` | 摘要、待辦、回覆草稿與草稿 CRUD |
@@ -455,7 +455,7 @@ Node.js 與 `node --check` 只適合開發時檢查 JavaScript 語法；Node 缺
 3. **外掛不是隔離程序**：載入第三方 Python 檔等同賦予本機程式權限。
 4. **外部 Agent 可能造成資料外送**：需要在啟用前清楚顯示資料範圍。
 5. **LIKE fallback 在大資料量較慢**：FTS5 是否可用取決於 Python 的 SQLite 編譯選項。
-6. **outbox 不等於寄信服務**：目前重點是排程、確認、撤销與本機匯出。
+6. **outbox 不等於寄信服務**：目前重點是排程、確認、撤銷與本機匯出。
 7. **單機單程序模型**：高併發寫入與多使用者情境不是目前設計目標。
 8. **外部 CLI 行為可能不同**：`gog`、`gsk` 與自訂 Agent CLI 需靠本機整合測試與明確版本假設維護。
 9. **衍生摘要需要失效策略**：郵件內容改變後，舊摘要與卡片何時重算需在下個路線圖項目明確化。
