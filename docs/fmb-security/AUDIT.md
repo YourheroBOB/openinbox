@@ -3,6 +3,7 @@
 - 稽核對象：YourheroBOB/openinbox（目前分支工作區）
 - 稽核日期：2026-10-13
 - 稽核方式：靜態程式碼審查（可見檔案：`server/features/agents.py`、`server/persona.py`、`server/second_brain.py`、`ui/modules/agents.js`、`agent.example.json`、`accounts.example.json`、`install.sh`、`run.sh`、`.gitignore`、fixtures、README／CONTRIBUTING、各 state/*.md 之實作紀錄）。**行號為目前分支的約略位置，定位以符號（函式／變數）名稱為準。**
+- **部分檢視／依符號推導（未取得全文）**：`server/features/_origin.py`、`server/agent_bridge.py`、`server/app.py`、`server/yhbmail.py` 等檔僅能由使用點、參數與 state 紀錄推導實作行為；凡依此推導的結論一律標記「待確認」（見各發現與「稽核範圍限制與未完成事項」）。
 - 本報告不含任何 token、金鑰、密碼、客戶個資、信件內文或當事人資料；所有範例皆為虛構或 `FAKE_VALUE_FOR_TEST` 佔位。
 
 ## 嚴重度定義
@@ -18,12 +19,12 @@
 
 | ID | 嚴重度 | 主旨 |
 |---|---|---|
-| A-01 | Medium | Origin 檢查未驗證 Host 標頭，DNS rebinding 可繞過本機來源限制 |
+| A-01 | Medium（待確認） | Origin 檢查未驗證 Host 標頭，DNS rebinding 可繞過本機來源限制 |
 | A-02 | Medium | 快取信件內容直接進 BYO agent context pack，提示注入（prompt injection）隔離不足 |
 | A-03 | Low | 多處檔案寫入非原子（deliverables、vault/index.json、persona），當機可留下損毀狀態 |
 | A-04 | Low | `read_deliverable` 未捕捉 `OSError`，並發刪檔時可能回 500 |
-| A-05 | Low | `openai_compatible`／`http` driver 的 URL 無 scheme／主機檢查，易誤設成明文外傳 |
-| A-06 | Low | CLI driver 需確保以 argv（非 shell）執行；範例設計正確但缺防護測試 |
+| A-05 | Low（待確認） | `openai_compatible`／`http` driver 的 URL 無 scheme／主機檢查，易誤設成明文外傳 |
+| A-06 | Low（待確認） | CLI driver 需確保以 argv（非 shell）執行；範例設計正確但缺防護測試 |
 | A-07 | Low（待確認） | `yhbmail.get_email` 等資料庫查詢需確認全程參數化 |
 | A-08 | Low | `second_brain.add_card` 以標題 slug 當 ID，可覆寫既有衍生卡片 |
 | A-09 | Info | HTTP API 完全無認證（設計上僅聽 127.0.0.1），殘餘風險需文件化 |
@@ -32,17 +33,19 @@
 
 ---
 
-## A-01（Medium）Origin 檢查未驗證 Host，DNS rebinding 可繞過
+## A-01（Medium，待確認）Origin 檢查未驗證 Host，DNS rebinding 可繞過
 
-**位置**：`server/features/_origin.py`（`local_origin`／`refuse`，全檔）；使用點如 `server/features/agents.py:330` 附近（`@post("/api/agents/task")` 等）。
+**位置**：`server/features/_origin.py`（`local_origin`／`refuse`，**僅部分檢視／依符號推導，未取得全文**）；使用點如 `server/features/agents.py:330` 附近（`@post("/api/agents/task")` 等）。
 
 **問題**：所有寫入端點（與多數讀取端點）以 `Origin` 標頭判斷是否本機來源。但 `Origin` 只在跨來源請求由瀏覽器保證；攻擊者網頁透過 DNS rebinding（先把網域指到公網 IP 載入頁面、再 rebind 到 127.0.0.1）可使後續請求變成「同源」，不帶 `Origin` 或帶攻擊者的 origin——後者已被擋，前者（rebinding 後的導航式請求與部分 fetch）若伺服器只看 `Origin` 不看 `Host`，即可直接讀寫 `/api/*`（含信件快取、deliverables、accounts 設定）。
+
+> **覆核狀態**：本發現的行為描述由使用點與符號名推導（`_origin.py` 未取得全文）；需取得全文後確認是否已有 Host／其他邊界檢查，再決定是否維持 Medium。
 
 **重現（概念驗證，勿在正式服務上做）**：本機起 server 後，用 curl 模擬無 Origin 請求即可見閘門只看 Origin：
 
 ```bash
 curl -s http://127.0.0.1:8770/api/agents/deliverables -H 'Host: attacker.example' -o /dev/null -w '%{http_code}\n'
-# 目前預期仍是 200：Host 未被驗證 → rebinding 場景下等同門戶大開
+# 依符號推導預期仍是 200（Host 未被驗證）→ 實際結果待確認；若為 200 則 rebinding 場景下等同門戶大開
 ```
 
 **修補建議（patch 片段）**：
@@ -140,11 +143,13 @@ def atomic_write_text(path: Path, data: str) -> None:
 
 ---
 
-## A-05（Low）BYO agent 的 `base_url`／`url` 無 scheme／主機檢查
+## A-05（Low，待確認）BYO agent 的 `base_url`／`url` 無 scheme／主機檢查
 
-**位置**：`agent.example.json`（`openai_compatible.base_url`、`http.url`）；實作在 `server/agent_bridge.py`（本次未完整檢視，見「未完成事項」）。
+**位置**：`agent.example.json`（`openai_compatible.base_url`、`http.url`）；實作在 `server/agent_bridge.py`（**待確認（未取得全文）**，見「稽核範圍限制與未完成事項」）。
 
-**問題**：context pack 內含 persona 與信件節選。使用者把 `base_url` 設成非 loopback 的 `http://` 位址時，資料會明文送給第三方，且無任何警示。屬「自帶 agent 本來就會外傳」的設計，但缺防呆。
+**覆核狀態**：`agent_bridge.py` 未取得全文，以下實作面敘述（載入設定時是否檢查 scheme／主機、是否有警示）**依符號與使用點推導**，需取得全文後確認。
+
+**問題**：context pack 內含 persona 與信件節選。使用者把 `base_url` 設成非 loopback 的 `http://` 位址時，資料會明文送給第三方，且（依推導）無任何警示。屬「自帶 agent 本來就會外傳」的設計，但缺防呆。
 
 **修補建議（patch 片段，於載入設定時檢查）**：
 
@@ -166,9 +171,11 @@ def _url_warning(url: str) -> str | None:
 
 ---
 
-## A-06（Low）CLI driver 需保證 argv 執行、無 shell
+## A-06（Low，待確認）CLI driver 需保證 argv 執行、無 shell
 
-**位置**：`agent.example.json` 的 `cli.command`；實作在 `server/agent_bridge.py`（未完整檢視）。
+**位置**：`agent.example.json` 的 `cli.command`；實作在 `server/agent_bridge.py`（**待確認（未取得全文）**，見「稽核範圍限制與未完成事項」）。
+
+**覆核狀態**：`agent_bridge.py` 未取得全文，實際的 `subprocess` 呼叫方式（`shell` 參數、stdin／argv 的使用）**待確認**；本節結論依 `agent.example.json` 的 argv 清單設計與 state 紀錄推導。
 
 **問題**：`cli.command` 設計為 argv 清單（正確），但需確保實際以 `subprocess.run(cmd_list, shell=False, ...)` 執行，且 context pack 只經 **stdin** 傳入、不成為 argv 的一部分（否則內容可被解譯成選項或引發注入）。另外錯誤路徑（CLI stderr 可能回顯 prompt）已在 `agents.error_label()` 做了不回傳訊息本文的處理——這點做得好。
 
@@ -259,6 +266,7 @@ Python 端寫檔後可 `os.chmod(path, 0o600)`（SQLite 檔由 SQLite 建立，�
 
 ## 稽核範圍限制與未完成事項
 
-- 本次可完整檢視的僅為提供內容之檔案；`server/app.py`、`server/yhbmail.py`、`server/agent_bridge.py`、`server/features/_origin.py`、`server/features/_outbox_transport.py`、`server/features/compose.py`、`server/features/search.py`、`server/features/imap.py`、`server/mcp_server.py`、`ui/index.html`、`scripts/overnight.py`、`.github/workflows/smoke.yml` 等**未在本次提供全文**，相關結論以 A-07、A-11 標記為「待確認」，需後續逐檔覆核。
+- 本次可完整檢視的僅為上方「可見檔案」清單所列檔案。`server/features/_origin.py`、`server/agent_bridge.py`、`server/app.py`、`server/yhbmail.py`、`server/features/_outbox_transport.py`、`server/features/compose.py`、`server/features/search.py`、`server/features/imap.py`、`server/mcp_server.py`、`ui/index.html`、`scripts/overnight.py`、`.github/workflows/smoke.yml` 等**未取得全文**，相關結論均為**部分檢視／依符號與使用點推導**，一律標記「待確認」（A-01、A-05、A-06、A-07、A-11），需後續逐檔覆核後確認或修正。
+- A-01 針對 `_origin.py` 的描述為依使用點推導（未取得全文），若全文顯示已有 Host／等效邊界檢查，應降級或結案；A-05、A-06 針對 `agent_bridge.py` 的實作敘述同理。
 - 未執行動態測試（fuzz、並發壓測、DNS rebinding 實測）；本報告的重現步驟為靜態推導。
 - 修補建議均為片段，尚未套用到程式碼（本任務僅產出報告，不改既有檔）。

@@ -3,7 +3,7 @@
 搭配 [AUDIT.md](AUDIT.md) 使用。狀態說明：
 - ✅ 通過：現有實作已妥善處理（有測試或明確程式碼佐證）
 - ⚠️ 部分：有防護但有殘餘風險（見 AUDIT 對應編號）
-- ❓ 待確認：本輪未取得該檔內容，需後續覆核
+- ❓ 待確認：本輪未取得該檔全文（或僅部分檢視／依符號推導），需後續覆核
 - ❌ 不通過：需修補
 
 ## 1. 輸入驗證
@@ -20,8 +20,8 @@
 
 | 項目 | 狀態 | 備註 |
 |---|---|---|
-| subprocess 一律 argv list、`shell=False` | ❓ | A-06：設計正確（agent.json 為 argv 清單），agent_bridge 實作待確認＋補測試 |
-| 使用者／信件內容不進入 argv（只走 stdin） | ❓ | A-06 |
+| subprocess 一律 argv list、`shell=False` | ❓ | A-06（待確認）：設計正確（agent.json 為 argv 清單），agent_bridge.py 未取得全文，實作待確認＋補測試 |
+| 使用者／信件內容不進入 argv（只走 stdin） | ❓ | A-06（待確認）：agent_bridge.py 未取得全文 |
 | CLI／HTTP 錯誤不回顯 prompt／stderr 給客戶端 | ✅ | `error_label()` 只回類型＋HTTP 碼 |
 
 ## 3. 路徑穿越
@@ -41,7 +41,7 @@
 | API 回應不含憑證值（只回環境變數名） | ✅ | `/api/providers` |
 | .gitignore 涵蓋 accounts.json／agent.json／data／.env／vault 個人檔 | ✅ | |
 | 錯誤回應不含 stack trace／endpoint body | ⚠️ | agents.py 已做好；全域 handler 待確認（A-04） |
-| BYO agent URL 明文外傳有警示 | ❌ | A-05：建議加 `_url_warning` |
+| BYO agent URL 明文外傳有警示 | ❓ | A-05（待確認）：agent_bridge.py 未取得全文，是否已有警示需覆核；若無則建議加 `_url_warning` |
 | 信件內容進 LLM pack 有不可信邊界標記 | ⚠️ | A-02：建議加 fence＋規則 |
 | repo 內無真實信箱／個資（fixtures 全虛構） | ✅ | 僅 example.com／.example 網域 |
 
@@ -81,7 +81,7 @@
 
 | 項目 | 狀態 | 備註 |
 |---|---|---|
-| CSRF：寫入端點檢查本機 Origin | ⚠️ | 已有，但 Host 未驗證（A-01 DNS rebinding） |
+| CSRF：寫入端點檢查本機 Origin | ⚠️ | 已有（依符號推導）；Host 未驗證（A-01 DNS rebinding）——`_origin.py` 未取得全文，待確認 |
 | XSS：deliverable HTML 全 escape、iframe sandbox、UI `h()` | ✅ | |
 | SW 只快取靜態檔、不碰 /api/* | ✅ | mobile 驗收測試 |
 | ICS 匯入 SSRF 防護（私有位址、redirect、大小上限） | ✅ | calendar 驗收測試 |
@@ -98,8 +98,8 @@
 
 ## 建議修補優先序
 
-1. **A-01**（Host 驗證）— 小改動、擋掉整類 rebinding 風險
+1. **A-01**（Host 驗證）— 小改動、擋掉整類 rebinding 風險（先取得 `_origin.py` 全文覆核）
 2. **A-02**（pack 不可信邊界）— 中改動、降低提示注入
 3. **A-03／A-04**（原子寫入＋OSError）— 可靠性
-4. **A-06／A-07／A-11**（待確認項逐檔覆核並補測試）
-5. **A-05／A-08／A-09／A-10**（防呆與文件化）
+4. **A-05／A-06／A-07／A-11**（待確認項逐檔覆核並補測試）
+5. **A-08／A-09／A-10**（防呆與文件化）
