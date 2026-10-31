@@ -11,8 +11,10 @@
         return {"echo": req.body}, 201
 
 A handler gets a `Request` and returns a dict (JSON, 200), a `(dict, status)`
-tuple, or a `Raw` response. A path ending in `*` matches by prefix. Feature
-routes are tried before the core routes in `app.py`, so never reuse a core path.
+tuple, or a `Raw` response. POST routes refuse other web pages (Origin check) unless
+marked with `@cross_origin_ok`; `/api/*` GETs refuse cross-site browser reads.
+A path ending in `*` matches by prefix. Feature routes are tried before the core
+routes in `app.py`, so never reuse a core path.
 Modules whose name starts with `_` are skipped. A module that fails to import
 is reported on `/api/features` instead of taking the server down.
 """
@@ -78,6 +80,12 @@ def route(method: str, path: str) -> Callable:
     return deco
 
 
+def cross_origin_ok(fn: Callable) -> Callable:
+    """Opt a POST route out of the central same-origin guard (it must do its own checks)."""
+    fn.cross_origin_ok = True
+    return fn
+
+
 def get(path: str) -> Callable:
     return route("GET", path)
 
@@ -125,7 +133,10 @@ def routes() -> list[dict]:
 
 
 def _read_body(handler) -> dict:
-    n = int(handler.headers.get("Content-Length") or 0)
+    try:
+        n = int(handler.headers.get("Content-Length") or 0)
+    except ValueError:
+        return {}
     if n <= 0:
         return {}
     try:
@@ -139,11 +150,8 @@ def _write(handler, body: bytes, content_type: str, status: int) -> None:
     handler.send_response(status)
     handler.send_header("Content-Type", content_type)
     handler.send_header("Cache-Control", "no-store")
-    path = urlparse(getattr(handler, "path", "") or "").path
-    # Outbox responses carry recipients and message text. The UI is same-origin and does not
-    # need this header; leaving it off stops another site from reading the body.
-    if not path.startswith("/api/outbox/"):
-        handler.send_header("Access-Control-Allow-Origin", "*")
+    # No Access-Control-Allow-Origin: the UI is same-origin, and a wildcard would let any web
+    # page read mail, contacts and calendar data from this local server.
     handler.send_header("Content-Length", str(len(body)))
     handler.end_headers()
     handler.wfile.write(body)
@@ -160,8 +168,17 @@ def dispatch(handler, method: str) -> bool:
         query={k: v[0] for k, v in parse_qs(parsed.query).items()},
         body=_read_body(handler) if method == "POST" else {},
     )
+    # Central same-origin guard so a route that forgets its own check is still covered: no web page
+    # may drive a state-changing POST, and API / print reads refuse cross-site browser requests.
+    from . import _origin
+    if method == "POST":
+        allowed = getattr(fn, "cross_origin_ok", False) or _origin.local_origin(req)
+    elif parsed.path.startswith(("/api/", "/mailops/")):
+        allowed = _origin.local_read(req)
+    else:
+        allowed = True
     try:
-        out = fn(req)
+        out = fn(req) if allowed else _origin.refuse(req.lang_zh())
     except Exception as e:
         traceback.print_exc(file=sys.stderr)
         out = ({"error": f"{type(e).__name__}: {e}"[:300]}, 500)

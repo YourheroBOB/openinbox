@@ -85,8 +85,15 @@ def list_skills() -> list[dict]:
 
 
 def skill_body(slug: str) -> str:
-    p = SKILLS_DIR / f"{slug}.md"
-    return p.read_text() if p.exists() else ""
+    """Prompt text of skills/<slug>.md; anything resolving outside skills/ (../, absolute) reads nothing."""
+    try:
+        base = SKILLS_DIR.resolve()
+        p = (base / f"{slug}.md").resolve()
+    except (OSError, ValueError):
+        return ""
+    if p.parent != base or not p.is_file():
+        return ""
+    return p.read_text()
 
 
 def _zh(lang: str) -> bool:
@@ -271,7 +278,10 @@ def _http(pack: dict, cfg: dict) -> str:
 
 def run_agent(ask: str = "", skill: str = "", driver: str | None = None, lang: str = "en") -> dict:
     cfg = load_agent_cfg()
-    driver = driver or cfg.get("driver") or "local"
+    configured = cfg.get("driver") or "local"
+    # A request may fall back to the local heuristic, but never switch to a driver the operator did
+    # not configure (e.g. `cli`, whose default command runs a local coding agent).
+    driver = driver if driver in ("local", configured) else configured
     pack = context_pack(ask=ask, skill=skill, lang=lang)
     error = None
     answer = ""
@@ -303,13 +313,22 @@ def run_agent(ask: str = "", skill: str = "", driver: str | None = None, lang: s
     return {"driver": used, "skill": skill or "freeform", "ask": ask, "answer": answer, "error": error}
 
 
+def _int_arg(value, default: int, hi: int) -> int:
+    try:
+        n = int(value) if value not in (None, "") else default
+    except (TypeError, ValueError):
+        n = default
+    return max(1, min(hi, n))
+
+
 def invoke_tool(name: str, args: dict | None = None) -> dict:
-    args = args or {}
+    args = args if isinstance(args, dict) else {}
     if name == "list_inbox":
         from yhbmail import list_emails
-        return {"emails": list_emails(q=args.get("q"), category=args.get("category"), limit=int(args.get("limit") or 20))}
+        return {"emails": list_emails(q=args.get("q"), category=args.get("category"),
+                                      limit=_int_arg(args.get("limit"), 20, 200))}
     if name == "brain_board":
-        return brain_board(int(args.get("hours") or 168))
+        return brain_board(_int_arg(args.get("hours"), 168, 8760))
     if name == "search_brain":
         from second_brain import search
         return {"cards": search(args.get("q") or "")}

@@ -8,16 +8,30 @@ from __future__ import annotations
 import os
 
 
+def _host_port(handler) -> int | None:
+    """Port from a loopback Host header (an ssh -L forward keeps the browser's port there)."""
+    host = (handler.headers.get("Host") or "").strip().lower()
+    name, _, port = host.rpartition(":")
+    if name in ("127.0.0.1", "localhost") and port.isdigit():
+        return int(port)
+    return None
+
+
 def local_origin(req) -> bool:
     handler = req.handler
     origin = handler.headers.get("Origin") if handler is not None else None
     if origin is None:
         return True
+    ports = set()
     try:
-        port = handler.server.server_address[1]
-    except (AttributeError, IndexError, TypeError):
-        port = int(os.environ.get("OPENINBOX_PORT", "8770"))
-    return origin.strip().lower().rstrip("/") in (f"http://127.0.0.1:{port}", f"http://localhost:{port}")
+        ports.add(int(handler.server.server_address[1]))
+    except (AttributeError, IndexError, TypeError, ValueError):
+        ports.add(int(os.environ.get("OPENINBOX_PORT", "8770")))
+    host_port = _host_port(handler)
+    if host_port is not None:
+        ports.add(host_port)
+    allowed = {f"http://{h}:{p}" for h in ("127.0.0.1", "localhost") for p in ports}
+    return origin.strip().lower().rstrip("/") in allowed
 
 
 def local_read(req) -> bool:

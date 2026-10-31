@@ -24,7 +24,7 @@ import re
 from datetime import datetime
 
 import yhbmail
-from features import get, post
+from features import cross_origin_ok, get, post
 from features._origin import local_origin, refuse
 
 try:
@@ -665,6 +665,7 @@ def rules_validate(req):
 
 
 @post("/api/rules/run")
+@cross_origin_ok  # dry-run only previews; the real run is checked below
 def rules_run(req):
     b = req.body
     dry_run = _flag(b.get("dry_run"), True)

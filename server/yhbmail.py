@@ -338,8 +338,9 @@ def list_emails(account=None, category=None, q=None, limit=80) -> list[dict]:
     if category and category != "all":
         sql += " AND category=?"; args.append(category)
     if q:
-        sql += " AND (subject LIKE ? OR snippet LIKE ? OR from_addr LIKE ? OR body_text LIKE ?)"
-        like = f"%{q}%"
+        sql += (" AND (subject LIKE ? ESCAPE '\\' OR snippet LIKE ? ESCAPE '\\'"
+                " OR from_addr LIKE ? ESCAPE '\\' OR body_text LIKE ? ESCAPE '\\')")
+        like = "%" + re.sub(r"([\\%_])", r"\\\1", str(q)) + "%"
         args.extend([like, like, like, like])
     sql += " ORDER BY date_ts DESC LIMIT ?"; args.append(limit)
     rows = [dict(r) for r in con.execute(sql, args)]
