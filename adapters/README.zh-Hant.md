@@ -21,7 +21,8 @@ TooPowerInbox 不附贈託管模型。面板預設跑本機啟發式。把 `agen
   "openai_compatible": {
     "base_url": "http://127.0.0.1:11434/v1",
     "model": "llama3.1",
-    "api_key_env": "OPENAI_API_KEY"
+    "api_key_env": "OPENAI_API_KEY",
+    "allow_private": true
   }
 }
 ```
@@ -44,3 +45,7 @@ TooPowerInbox 不附贈託管模型。面板預設跑本機啟發式。把 `agen
 工具：`list_inbox`、`brain_board`、`search_brain`、`persona`、`save_draft`。
 
 不開放寄信。草稿只留在本機 SQLite。
+
+### CLI 驅動與權限
+
+`cli` 會把完整 context pack（含信件摘要）寫進你指定命令的 stdin。若該命令自帶檔案或網路工具，權限屬於**那個命令**本身，TooPowerInbox 不會再沙箱化。

@@ -174,11 +174,33 @@ def classify(row: dict) -> tuple[str, str]:
     return "fyi", "No hard action"
 
 
-def upsert_email(con: sqlite3.Connection, item: dict) -> None:
+def _body_text_value(item: dict) -> str | None:
+    if "body_text" not in item:
+        return None
+    raw = item.get("body_text")
+    if raw is None or raw == "":
+        return None
+    return str(raw)
+
+
+def upsert_email(con: sqlite3.Connection, item: dict, preserve_read_state: bool = False) -> None:
     cat, reason = classify(item)
     ts = item.get("date_ts") or parse_date_ts(item.get("date_raw") or "")
+    body_val = _body_text_value(item)
+    if preserve_read_state:
+        unread_sql = (
+            "CASE WHEN emails.unread=1 THEN 1 "
+            "WHEN emails.unread=0 THEN 0 "
+            "ELSE excluded.unread END"
+        )
+        cat_sql = "CASE WHEN emails.unread=0 THEN emails.category ELSE excluded.category END"
+        reason_sql = "CASE WHEN emails.unread=0 THEN emails.flag_reason ELSE excluded.flag_reason END"
+    else:
+        unread_sql = "excluded.unread"
+        cat_sql = "excluded.category"
+        reason_sql = "excluded.flag_reason"
     con.execute(
-        """
+        f"""
         INSERT INTO emails(
             id, account, platform, thread_id, subject, snippet, from_addr, to_addr,
             date_raw, date_ts, unread, has_attachment, labels_json, body_text,
@@ -186,9 +208,12 @@ def upsert_email(con: sqlite3.Connection, item: dict) -> None:
         ) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)
         ON CONFLICT(id) DO UPDATE SET
             subject=excluded.subject, snippet=excluded.snippet, from_addr=excluded.from_addr,
-            date_raw=excluded.date_raw, date_ts=excluded.date_ts, unread=excluded.unread,
-            body_text=COALESCE(excluded.body_text, emails.body_text),
-            category=excluded.category, flag_reason=excluded.flag_reason, synced_at=excluded.synced_at
+            date_raw=excluded.date_raw, date_ts=excluded.date_ts,
+            unread={unread_sql},
+            body_text=CASE WHEN excluded.body_text IS NULL THEN emails.body_text ELSE excluded.body_text END,
+            category={cat_sql},
+            flag_reason={reason_sql},
+            synced_at=excluded.synced_at
         """,
         (
             item["id"], item["account"], item.get("platform") or "demo",
@@ -197,7 +222,7 @@ def upsert_email(con: sqlite3.Connection, item: dict) -> None:
             item.get("to_addr") or "", item.get("date_raw") or "", ts,
             1 if item.get("unread") else 0, 1 if item.get("has_attachment") else 0,
             json.dumps(item.get("labels") or [], ensure_ascii=False),
-            item.get("body_text") or "", cat, reason, now_iso(),
+            body_val, cat, reason, now_iso(),
         ),
     )
 
@@ -295,6 +320,16 @@ def gsk_list(account: str, limit: int = 25) -> list[dict]:
     return rows
 
 
+def purge_demo_rows() -> None:
+    con = db()
+    con.execute("DELETE FROM emails WHERE id LIKE 'demo:%'")
+    con.execute(
+        "DELETE FROM events WHERE id LIKE 'demo-cal-%' OR calendar_id='demo' OR id LIKE 'demo:%'"
+    )
+    con.commit()
+    con.close()
+
+
 def sync_all(limit: int = 25) -> dict:
     cfg = load_cfg()
     mode = cfg.get("mode") or "demo"
@@ -315,7 +350,7 @@ def sync_all(limit: int = 25) -> dict:
                 rows = []
             con = db()
             for r in rows:
-                upsert_email(con, r)
+                upsert_email(con, r, preserve_read_state=True)
             con.commit()
             con.close()
             report["accounts"].append({
@@ -324,6 +359,9 @@ def sync_all(limit: int = 25) -> dict:
             })
         except Exception as e:
             report["accounts"].append({"email": acc.get("email"), "error": str(e)[:300]})
+            report["ok"] = False
+    if any(not a.get("error") for a in report["accounts"]):
+        purge_demo_rows()
     LAST_SYNC.clear()
     LAST_SYNC.update({"at": now_iso(), **report})
     return report
