@@ -33,7 +33,7 @@ class ParseMentionNoTriggerTest(unittest.TestCase):
 
     def test_glued_at_signs_are_not_mentions(self):
         # The regexp guards against a word character or a dot right before the "@".
-        for text in ("bob@agent.com", "bob.@agent", "x@agentresearch", "team@agent_ops"):
+        for text in ("bob@agent.example.com", "bob.@agent", "x@agentresearch", "team@agent_ops"):
             with self.subTest(text=text):
                 self.assertIsNone(agents.parse_mention(text))
 
@@ -127,7 +127,7 @@ class AliasRoutingTest(unittest.TestCase):
         for value in (
             "",
             "   ",
-            "agent@example.com.evil.test",
+            "agent@evil.example.com",
             "notagent@example.com",
             "agent+tag@example.com",
             "agent@example.org",
