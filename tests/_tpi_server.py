@@ -29,6 +29,14 @@ os.environ["OPENINBOX_ROOT"] = str(ROOT)
 os.environ["OPENINBOX_NO_BROWSER"] = "1"
 sys.path.insert(0, str(REPO / "server"))
 
+# A test file may import features/yhbmail at module scope before this bootstrap
+# runs (unittest discover sorts test_fmb_* ahead of test_tpi_*). Those modules
+# freeze ROOT at first import, so drop them and re-import against the throwaway root.
+_PREMATURE = ("yhbmail", "app", "persona", "second_brain", "features")
+for _name in list(sys.modules):
+    if _name in _PREMATURE or _name.startswith("features."):
+        del sys.modules[_name]
+
 import app  # noqa: E402
 import features  # noqa: E402
 import persona  # noqa: E402
