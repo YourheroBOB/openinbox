@@ -92,7 +92,7 @@ cards.sort(key=lambda c: ((c.get("created") or ""), (c.get("id") or "")), revers
 
 **說明**：`COMPANY_WORDS = re.compile(r"(公司|company|corp|inc|ltd|co\.|股份|有限)", re.I)` 沒有詞界。英文子字串會誤判：`include`、`principal`、`since` 都含 `inc`；`scope` 含 `co` 但因模式是 `co\.` 不會誤判，而 `inc` 已足以造成問題。這會讓 `@agent` 的一般請求被路由成 `research_company`。
 
-**建議修法**：英文缩写加詞界；中文維持子字串。補測試釘住 `include`、`principal`、`Acme Inc`。
+**建議修法**：英文縮寫加詞界；中文維持子字串。補測試釘住 `include`、`principal`、`Acme Inc`。
 
 ```python
 COMPANY_WORDS = re.compile(
@@ -101,7 +101,7 @@ COMPANY_WORDS = re.compile(
 )
 ```
 
-**驗收建議**：`parse_mention("@agent include the principal update")` 應為 `research_person`；`parse_mention("@agent Acme Inc recent threads")` 應為 `research_company`。
+**驗收建議**：`parse_mention("@agent include the principal update")` 應為 `research_person`；`parse_mention("@agent Acme Inc recent threads")` 應為 `research_company`。（以上兩例為期望結果的推測，需先對照 `server/features/agents.py` 的 `parse_mention` 實際路由規則確認後，才能訂為正式斷言。）
 
 ---
 
@@ -113,7 +113,7 @@ COMPANY_WORDS = re.compile(
 
 **說明**：`list_deliverables()` 對 `OSError`／`JSONDecodeError` 直接 `continue`；UI `loadCards()` 雖存 `error`，但 `cardsHtml()` 只看 `deliverables`，所以磁碟或 JSON 壞掉時，使用者看到「還沒有成果卡片」而不是「讀取失敗」。這會讓 A1 的半成品更難被發現。
 
-**建議修法（產品碼，尚未套用）**：API 可回報略過的成功／失敗计数，UI 顯示錯誤。例：
+**建議修法（產品碼，尚未套用）**：API 可回報略過的成功／失敗計數，UI 顯示錯誤。例：
 
 ```python
 skipped = 0
