@@ -23,7 +23,8 @@ Copy `agent.example.json` to `agent.json` (the installer already does this).
   "openai_compatible": {
     "base_url": "http://127.0.0.1:11434/v1",
     "model": "llama3.1",
-    "api_key_env": "OPENAI_API_KEY"
+    "api_key_env": "OPENAI_API_KEY",
+    "allow_private": true
   }
 }
 ```
@@ -46,3 +47,7 @@ Copy `agent.example.json` to `agent.json` (the installer already does this).
 Tools: `list_inbox`, `brain_board`, `search_brain`, `persona`, `save_draft`.
 
 Send is not exposed. Drafts stay in the local SQLite file.
+
+### CLI driver and permissions
+
+The `cli` driver writes the full context pack (including mail snippets) to your command's stdin. If that command has its own file or network tools, those run with **that command's** privileges—TooPowerInbox does not sandbox them further.

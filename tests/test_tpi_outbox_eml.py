@@ -122,7 +122,7 @@ class EmlTest(OutboxCase):
         self.assertIn(b"maya@example.com", raw)
         status, headers, _ = srv.request("GET", "/api/health")
         self.assertEqual(status, 200)
-        self.assertIn("access-control-allow-origin", {k.lower() for k in headers})
+        self.assertNotIn("access-control-allow-origin", {k.lower() for k in headers})
 
     def test_write_failure_keeps_the_message_queued(self):
         item = self.confirmed("now")
