@@ -6,9 +6,7 @@ next: 全部 14 個 WP 已合併到 main；orchestrator 只做維護（新 PR／
 parity: 38/38（100%）　更新：2026-10-12 23:15 (UTC+8)
 
 ## 運作方式
-- 正本在 GitHub；GB1 `/workspace/cursor-runs/parity/orchestrate.py` 每 15 分鐘依 work package（WP）派 `run_loop.sh`（最多 4 個平行、分支 `agent/<wp>`、各自狀態檔 `state/<wp>.md`）。
-- 每個 WP 完成後由 GB1 PR 自動審查管線（Tier 3）審查，PASS 才 squash 合併；衝突與未完成會自動重派。本檔由 orchestrator 產生，請勿手改。
-- 公開 repo 只放通用功能與虛構示範資料；YHB 專屬（客戶名冊分類、真信回填、情報雷達）在私有 repo YourheroBOB/yhb-mail。
+- 公開 repo 只放通用功能與虛構示範資料。
 - 不部署、不寄信：Schedule／Undo Send 只產生本機 outbox，寄送永遠由使用者自己確認。
 
 ## GenMail 功能對照清單（Genspark GenMail 官方說明：https://www.genspark.ai/helpcenter/genmail 、https://www.genspark.ai/genmail 、/tools/ai-email-agent 、/tools/ai-email-assistant（1151011 擷取））
@@ -77,29 +75,3 @@ parity: 38/38（100%）　更新：2026-10-12 23:15 (UTC+8)
 | tpi-followup | merged | tpi-triage | 2 | https://github.com/YourheroBOB/openinbox/pull/20 |
 | tpi-agents | merged | tpi-skills | 1 | https://github.com/YourheroBOB/openinbox/pull/28 |
 | tpi-mobile | merged | tpi-mailops | 2 | https://github.com/YourheroBOB/openinbox/pull/25 |
-
-## 來源卡片
-- Linear HQ-1173：土炮 GenMail MVP（openinbox＋gsk 驅動＋BYOK，本機 8788 埠）。
-- Linear HQ-1299：v2.0（分類器升級、歷史回填、情報雷達、MCP 伺服器）— YHB 專屬部分已移到私有 yhb-mail；通用 MCP 伺服器在本 repo 由 tpi-mcp 實作。
-
-## log
-- [2026-10-11 23:46:10] tpi-followup remote test auto 3a67a97: pass
-- [2026-10-11 23:46:12] launch tpi-mobile attempt 1 (a) log=/workspace/cursor-runs/tpi-mobile-a1.log
-- [2026-10-11 23:46:16] STATE sync PR https://github.com/YourheroBOB/openinbox/pull/23
-- [2026-10-12 00:00:03] tpi-followup merged https://github.com/YourheroBOB/openinbox/pull/20
-- [2026-10-12 00:00:05] launch tpi-mobile attempt 2 (r) log=/workspace/cursor-runs/tpi-mobile-r2.log
-- [2026-10-12 00:15:07] STATE sync PR https://github.com/YourheroBOB/openinbox/pull/24
-- [2026-10-12 08:01:46] tpi-mobile remote test auto 1ddf2ac: pass
-- [2026-10-12 08:15:03] tpi-mobile merged https://github.com/YourheroBOB/openinbox/pull/25
-- [2026-10-12 08:15:07] STATE sync PR https://github.com/YourheroBOB/openinbox/pull/26
-- [2026-10-12 08:50:07] launch tpi-agents attempt 1 (v2a) log=/workspace/cursor-runs/tpi-agents-v2a1.log
-- [2026-10-12 08:50:07] tpi-agents: A/B BRIEF=v2 手動派工（ab-brief，跳過 deps tpi-skills＝needs-bob 未合併）
-- [2026-10-12 09:16:42] tpi-agents remote test auto fc0154b: pass
-- [2026-10-12 13:45:34] tpi-skills remote test auto ef6a8a9: pass
-- [2026-10-12 14:00:08] tpi-agents merged https://github.com/YourheroBOB/openinbox/pull/28
-- [2026-10-12 14:00:13] STATE sync PR https://github.com/YourheroBOB/openinbox/pull/30
-- [2026-10-12 20:49:09] tpi-skills remote test auto 6a3c4a8: pass
-- [2026-10-12 22:45:03] tpi-outbox merged https://github.com/YourheroBOB/openinbox/pull/22
-- [2026-10-12 22:45:10] STATE sync PR https://github.com/YourheroBOB/openinbox/pull/35
-- [2026-10-12 22:55:18] tpi-skills merged https://github.com/YourheroBOB/openinbox/pull/27
-- [2026-10-12 22:55:22] state-sync 修審查（PR #35 第 1 輪）：orchestrate.py 合併判斷改以 origin/main 為準（MERGED PR 含替代分支 agent/<wp>-*，merge commit 須在 main；後備認 main 上 agent/<wp>: squash commit），重產 STATE.md → tpi-skills merged #27、38/38；驗證：離線案例＋dry-run、unittest 711 OK、smoke OK（隨機 port）
