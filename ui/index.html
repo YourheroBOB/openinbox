@@ -261,7 +261,8 @@
           { t: "收件匣分類", ask: "把最近的信分成需要你、值得看、僅供參考、可清掉，並點名最大的噪音來源。" },
           { t: "本週怎麼排", ask: "把行事曆與信箱待辦合成一張本週圖：會議、截止、還有卡住的回信。" },
         ],
-        emptyList: "這個分類沒有信。按「同步」抓信件；demo 模式已有種子信。", noEvents: "尚無事件，按「同步」抓日曆。",
+        emptyList: "這個分類沒有信。按「同步」抓信件；demo 模式已有種子信。", noEvents: "尚無行程（目前僅示範資料；同步不會抓行事曆）。",
+        snippetOnly: "（live 同步目前只存摘要，下面不是全文）",
         emptyDrafts: "草稿匣是空的。開一封信按「回信草稿×3」，Copilot 會幫你起草。", noCards: "還沒有第二大腦卡片。",
         draftsTitle: "本機草稿匣", draftsHint: "草稿只存在這台機器；設計上不自動寄信。",
         welcomeTitle: "TooPowerInbox · 本機 GenMail 式郵件大腦",
@@ -292,7 +293,8 @@
           { t: "Categorize inbox", ask: "Split recent mail into Needs you / Worth a look / FYI / Cleanup and name the loudest noise source." },
           { t: "Plan my week", ask: "Merge calendar and inbox todos into one week view: meetings, deadlines, stuck replies." },
         ],
-        emptyList: "Nothing in this bucket. Hit Sync (demo mode seeds sample mail).", noEvents: "No events yet — hit Sync.",
+        emptyList: "Nothing in this bucket. Hit Sync (demo mode seeds sample mail).", noEvents: "No events yet (demo-only; sync does not fetch calendars).",
+        snippetOnly: "(Live sync stores snippets only; this is not the full message body.)",
         emptyDrafts: "Drafts are empty. Open an email and hit 'Draft replies ×3'.", noCards: "No second-brain cards yet.",
         draftsTitle: "Local drafts", draftsHint: "Drafts stay on this machine; nothing is ever auto-sent.",
         welcomeTitle: "TooPowerInbox · a local GenMail-style inbox brain",
@@ -500,6 +502,7 @@
         const row = $("list").querySelector(`.row[data-id="${CSS.escape(id)}"]`); if (row) row.classList.remove("unread");
       }
       renderCpContext();
+      const snippetOnly = state.cfg?.mode === "live" && !data.body_text && !!data.snippet;
       const body = data.body_text || data.snippet || "";
       const long = body.length > 700;
       const isMd = /(^|\n)\s{0,3}(#{1,4}\s|\*\*|[-*]\s|\d+\.\s|>\s)/.test(body.slice(0, 400));
@@ -512,16 +515,19 @@
           <button class="btn" onclick="cpAction('todos')">${esc(T("cpTodos"))}</button>
           <button class="btn" onclick="cpAction('draft')">${esc(T("cpDraft"))}</button>
           <button class="btn ghost" onclick="copyText(state.selected.body_text || state.selected.snippet || '')">${esc(T("cpCopyBody"))}</button>
-          <button class="btn ghost" onclick="toggleUnread('${esc(id)}', true)">${esc(T("cpMarkUnread"))}</button>
+          <button class="btn ghost" data-mark-unread="1">${esc(T("cpMarkUnread"))}</button>
         </div>
         <div class="msg ${long ? "collapsed" : ""}">
           <div class="msghead">${avatarHtml(data.from_addr)}<span class="who">${esc(fromLabel(data.from_addr))}</span><span class="when">${esc(fmtDT(data.date_raw).slice(0, 26))}</span></div>
+          ${snippetOnly ? `<p class="muted">${esc(T("snippetOnly"))}</p>` : ""}
           <div class="body ${isMd ? "md" : ""}">${isMd ? mdHtml(body) : esc(body) || "—"}</div>
           ${long ? `<button class="expand">${esc(T("showFull"))}（${body.length.toLocaleString()} ${esc(T("chars"))}）…</button>` : ""}
         </div>
         <p class="hint"><kbd>j</kbd><kbd>k</kbd><kbd>Enter</kbd> · <kbd>c</kbd> Copilot · <kbd>/</kbd></p>`;
       const ex = $("pane").querySelector(".expand");
       if (ex) ex.onclick = () => { ex.closest(".msg").classList.remove("collapsed"); ex.remove(); };
+      const mu = $("pane").querySelector("[data-mark-unread]");
+      if (mu) mu.onclick = () => toggleUnread(id, true);
     }
 
     function mdHtml(src) {
@@ -627,7 +633,7 @@
           <div class="meta">${esc(fmtDT(e.start_local).slice(5, 10))}</div>
         </div>`).join("") || `<div class='empty'>${esc(T("noEvents"))}</div>`;
       $("pane").innerHTML = `<h2 class="mh">${zh() ? "日曆" : "Calendar"}</h2>
-        <p class="muted">${zh() ? "未來行程（同步時抓取）" : "Upcoming events (fetched on sync)"} · ${events.length}</p>`;
+        <p class="muted">${zh() ? "未來行程（示範資料；同步不會抓行事曆）" : "Upcoming events (demo data; sync does not fetch calendars)"} · ${events.length}</p>`;
     }
     window.showCalDetail = (idx) => {
       const e = state.calEvents[idx]; if (!e) return;
@@ -788,7 +794,10 @@
       t.remove();
       state.cpBusy = false; $("cpSend").disabled = false;
       if (mode === "chat" && ask) state.cpHistory.push({ role: "user", text: ask });
-      if (data.error) { bubble("ai", T("callFail") + data.error, { fallback: true }); return; }
+      if (data.error && !(data.fallback && data.text)) {
+        bubble("ai", T("callFail") + data.error, { fallback: true });
+        return;
+      }
       state.cpHistory.push({ role: "model", text: (data.text || "").slice(0, 1500) });
       if (state.cpHistory.length > 10) state.cpHistory = state.cpHistory.slice(-10);
       bubble("ai", data.text || "—", { fallback: data.fallback, drafts: mode === "draft" });
@@ -815,8 +824,9 @@
         const h = await api("/api/health").catch(() => null);
         if (!h || !h.sync?.running || n > 40) {
           clearInterval(t);
-          $("syncStatus").textContent = h?.sync?.last ? T("lastSync") + " " + h.sync.last : (h?.sync?.error || T("synced"));
-          toast(T("synced"));
+          const syncErr = h?.sync?.error;
+          $("syncStatus").textContent = syncErr ? syncErr : (h?.sync?.last ? T("lastSync") + " " + h.sync.last : T("synced"));
+          toast(syncErr ? syncErr : T("synced"), !!syncErr);
           loadInbox(); refreshCounts();
         }
       }, 1500);
@@ -833,6 +843,7 @@
       if (!h) return;
       updateAgentChip(h);
       if (h.sync?.running) $("syncStatus").textContent = T("syncing");
+      else if (h.sync?.error) $("syncStatus").textContent = h.sync.error;
       else if (h.sync?.last) $("syncStatus").textContent = T("lastSync") + " " + h.sync.last;
     }
 
